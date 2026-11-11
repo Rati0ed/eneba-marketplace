@@ -1,0 +1,24 @@
+# Dependencies (re-created by `npm install`)
+node_modules/
+
+# Build output
+frontend/dist/
+backend/server
+backend/bin/
+*.exe
+
+# Local database files (re-created and seeded on every start)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+
+# Editor / OS junk
+.DS_Store
+.vscode/
+.idea/
