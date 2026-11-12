@@ -303,3 +303,111 @@ After an `INSERT`, `res.LastInsertId()` returns the id SQLite gave the new row. 
 
 ### Don't leak internal errors
 `serverError` logs the real error for us but sends the client only `"something went wrong"`. Details like SQL text or file paths help attackers.
+
+---
+
+## Frontend tooling
+
+### npm and package.json
+- **npm** downloads JavaScript libraries (like `pip`).
+- `package.json` lists our libraries and scripts (like `requirements.txt` + a Makefile):
+  - `dependencies`: needed in the browser: `react`, `react-dom`.
+  - `devDependencies`: only needed to build/check: `vite`, `typescript`, `oxlint`.
+  - `scripts`: `npm run dev` (dev server), `npm run build` (check types + build), `npm run lint` (find bugs).
+- `package-lock.json` pins the **exact** versions of every library, so Vercel installs the same versions we tested.
+- `^19.3.1` means "19.3.1 or a newer 19.x"; the lock file decides the exact one.
+
+### Vite
+The tool that runs and builds our frontend.
+- `npm run dev`: a local dev server on http://localhost:5173. Saving a file updates the page instantly.
+- `npm run build`: turns our TypeScript/React files into plain HTML, CSS and JS in `dist/`. Browsers can't run TypeScript, so this step is needed. Vercel runs this and serves `dist/`.
+
+### VITE_ environment variables are baked in at build time
+`import.meta.env.VITE_API_URL` is **replaced by its value when the app is built** (in `src/api.ts`). Two consequences:
+1. After changing `VITE_API_URL` on Vercel you must **redeploy**; the old build still has the old value.
+2. Anything in a `VITE_` variable is visible to everyone who opens the site. **Never put secrets there.** (The API URL is fine; it's public anyway.)
+Only variables starting with `VITE_` are exposed, so other variables on the build machine don't leak into the app by accident.
+
+---
+
+## TypeScript
+
+TypeScript = JavaScript + types. The types are checked when building (`tsc`), then removed; the browser runs plain JavaScript.
+
+### Types for our data
+```ts
+export type ProductCard = {
+  id: number
+  title: string
+  lowest_price_cents: number | null   // "number or null"
+}
+```
+If we write `product.titel`, the build fails instead of showing `undefined` on the page. Python comparison: type hints, but actually enforced.
+
+### `number | null` (union type)
+A value that can be one of several types. TypeScript forces us to handle `null` before using it as a number. That's why `App.tsx` checks `product.lowest_price_cents === null` before `formatPrice(...)`.
+
+### Generics `<T>`
+```ts
+async function apiGet<T>(path: string): Promise<T>
+apiGet<{ items: ProductCard[] }>('/api/products')
+```
+`T` is a type parameter: the caller fills it in. One function works for every endpoint and still knows the return type.
+
+### `async` / `await` / Promise
+Network requests take time. A **Promise** is "a value that will arrive later". `await` waits for it without freezing the page.
+```ts
+const response = await fetch(API_URL + path)
+```
+Python comparison: the same `async`/`await` as in `asyncio`.
+
+### `fetch`
+The browser's built-in function for HTTP requests (like Python `requests.get`). It does **not** throw on 404/500, only on network failure, so we check `response.ok` ourselves in `apiGet`.
+
+---
+
+## React
+
+### Component and JSX
+A component is a function that returns what to show. JSX is the HTML-like syntax inside it:
+```tsx
+export default function App() {
+  return <h1>Store</h1>
+}
+```
+Differences from HTML: `className` instead of `class`; `{...}` inserts a TypeScript value: `{product.title}`.
+React escapes everything inserted with `{}`, so a product title containing `<script>` is shown as text. That's our main XSS protection.
+
+### useState: memory of a component
+```tsx
+const [loading, setLoading] = useState(true)
+```
+`loading` is the current value; `setLoading(false)` changes it **and re-renders** the component. A normal variable would reset every time the function runs, and changing it wouldn't update the screen.
+
+### useEffect: do something after showing
+```tsx
+useEffect(() => {
+  fetchProducts(...).then(setProducts)
+  return () => controller.abort()   // cleanup
+}, [])                               // [] = run once, when the component first appears
+```
+Rendering must only *describe* the page. Side effects like network requests go in `useEffect`. The returned function is the **cleanup**, which runs when the component disappears.
+
+### Loading / error / success states
+Every request can be slow or fail. `App.tsx` keeps three pieces of state (`loading`, `error`, `products`) and shows a different UI for each. Without this, users see a blank page while waiting.
+
+### Lists and `key`
+```tsx
+{products.map((p) => <li key={p.id}>...</li>)}
+```
+`.map` turns data into elements (like a Python list comprehension). `key` must be unique and stable; React uses it to know which item is which when the list changes.
+
+### Conditional rendering
+- `{loading && <p>Loading…</p>}`: shows the `<p>` only if `loading` is true.
+- `{cond ? <A/> : <B/>}`: if/else inside JSX.
+
+### StrictMode
+`main.tsx` wraps the app in `<StrictMode>`. In development only, React runs effects twice to expose missing cleanups. That's why our request uses an `AbortController`: the first request is cancelled cleanly.
+
+### AbortController
+Cancels a `fetch` that's in progress. We cancel in the effect's cleanup, so a late answer never updates a component that's gone.

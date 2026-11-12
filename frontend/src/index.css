@@ -1,0 +1,90 @@
+/* Day 1: just enough styling to be readable. Full Eneba-style design comes on Day 2. */
+
+:root {
+  /* CSS variables: define colors once, use them everywhere with var(--name). */
+  --bg: #1a0b3d;
+  --surface: #2a1563;
+  --text: #ffffff;
+  --text-muted: #b9aee0;
+  --accent: #ffe94b;
+  --error: #ff6b6b;
+
+  font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.status {
+  color: var(--text-muted);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+.product-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+/* Each row: image | title + meta | price */
+.product-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.product-row img {
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.product-info {
+  flex: 1;
+  min-width: 0; /* lets long titles wrap instead of pushing the price off screen */
+}
+
+.product-title {
+  font-weight: 600;
+}
+
+.product-meta {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.product-price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.product-price .from {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.sold-out {
+  color: var(--text-muted);
+}

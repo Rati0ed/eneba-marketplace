@@ -24,3 +24,14 @@ Files: `backend/main.go`, `backend/db/db.go`, `backend/db/schema.sql`, `backend/
 5. **`middleware/middleware.go`**: a hacker runs `curl https://our-api/api/products` from their laptop. Does our CORS setup stop them? What *does* CORS protect against?
 6. **`db/seed.go`**: why do we use `rand.New(rand.NewSource(42))` instead of a truly random generator? Would that be OK for real game keys?
 7. **`handlers/covers.go`**: what could happen if we put the product title into the SVG without `html.EscapeString`?
+
+---
+
+## Day 1 · Step 3: Frontend
+Files: `frontend/src/api.ts`, `frontend/src/App.tsx`, `frontend/src/vite-env.d.ts`, `frontend/.env.example`
+
+1. **`src/api.ts`**: you change `VITE_API_URL` in Vercel's settings, but the live site still calls the old URL. Why, and what do you do?
+2. **`src/api.ts`**: someone suggests storing an API key for a payment provider in `VITE_PAYMENT_KEY`. Why is that a bad idea?
+3. **`src/App.tsx`**: why is the request inside `useEffect` and not written directly in the component function body? What would happen if it were in the body?
+4. **`src/App.tsx`**: what are the three states the page can be in, and what does the user see in each?
+5. **`src/api.ts`**: `fetch` gets a `404` response. Does it throw an error? How does `apiGet` handle it?

@@ -45,4 +45,17 @@ Environment variables (all optional locally):
 | `JWT_SECRET` | – | Secret for signing login tokens (used from Day 5) |
 | `DB_PATH` | `data.db` | SQLite file; deleted and re-seeded on every start |
 
+## Run the frontend locally
+
+Needs Node 20.19+.
+
+```bash
+cd frontend
+npm install
+npm run dev              # http://localhost:5173, talks to http://localhost:8080 by default
+```
+
+To use another API, create `frontend/.env.local` with `VITE_API_URL=https://your-api.example.com`
+(see `frontend/.env.example`).
+
 > Live links and screenshots will be added on Day 7.
