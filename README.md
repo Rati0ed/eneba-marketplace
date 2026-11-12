@@ -20,4 +20,29 @@ buy a game through a simulated checkout and receive a digital key.
 
 Full design, data model, API list and trade-offs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-> Setup instructions, live links and screenshots will be added on Day 7.
+## Run the backend locally
+
+Needs Go 1.22+ and a C compiler (gcc), because the SQLite driver includes SQLite's C code.
+
+```bash
+cd backend
+go run .                 # starts on http://localhost:8080 with a freshly seeded database
+go test ./...            # run the tests
+```
+
+Try it:
+```bash
+curl http://localhost:8080/api/health
+curl http://localhost:8080/api/products
+```
+
+Environment variables (all optional locally):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8080` | HTTP port (Render sets it automatically) |
+| `ALLOWED_ORIGIN` | `http://localhost:5173` | Frontend URL(s) allowed by CORS, comma-separated |
+| `JWT_SECRET` | – | Secret for signing login tokens (used from Day 5) |
+| `DB_PATH` | `data.db` | SQLite file; deleted and re-seeded on every start |
+
+> Live links and screenshots will be added on Day 7.

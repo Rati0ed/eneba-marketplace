@@ -32,7 +32,7 @@ Same idea in plain text:
 | Decision | Why |
 |---|---|
 | Go standard library `net/http` router (Go 1.22+) | Supports `GET /api/products/{slug}` out of the box. No framework to learn or explain. |
-| `modernc.org/sqlite` driver | Pure Go, no C compiler needed. Builds cleanly on Render. |
+| `mattn/go-sqlite3` driver | The most widely used Go SQLite driver, hosted on GitHub. It wraps SQLite's C code, so the build needs a C compiler (CGO). Render's build image has one. *Changed on Day 1: the planned pure-Go `modernc.org/sqlite` couldn't be downloaded in our build workspace.* |
 | Only 2 Go libraries besides the driver: `golang-jwt/jwt` and `x/crypto/bcrypt` | Login tokens and password hashing are security code. We use proven libraries instead of writing our own. |
 | React Router for pages, plain `fetch` for API calls | No extra state library. Login state and the cart live in React Context (a shared "global variable" for components). |
 | Plain CSS with CSS variables for Eneba colors | Easy to read. One place to change the theme. |
@@ -41,12 +41,14 @@ Same idea in plain text:
 **Backend folder layout (planned)**
 ```
 backend/
-  main.go            starts the server, connects routes
-  db/schema.sql      CREATE TABLE statements
-  db/seed.go         fills the database with sample data
-  handlers/          one file per area: products.go, auth.go, orders.go, home.go
-  search/search.go   typo-tolerant search (+ search_test.go)
-  middleware/        auth check, CORS, logging
+  main.go              config from env vars, routes, starts the server
+  db/db.go             opens a fresh SQLite file, runs schema, seeds
+  db/schema.sql        CREATE TABLE statements (embedded into the binary)
+  db/seed.go           inserts the sample data (fixed random seed = same data every start)
+  db/seed_data.go      the sample catalog itself: games, gift cards, sellers, banners
+  handlers/            one file per area: products.go, covers.go, later auth.go, orders.go, home.go
+  search/search.go     typo-tolerant search (+ search_test.go)  [Day 3]
+  middleware/          CORS, logging, later auth check
 ```
 
 ---
@@ -66,7 +68,7 @@ erDiagram
 
 | Table | Key fields | Notes |
 |---|---|---|
-| **products** | id, slug, title, platform, region, genre, description, image_url, msrp_cents, release_date | One row = one sellable variant, e.g. "Elden Ring (PC) Steam Key GLOBAL". Like Eneba, platform and region are part of the product. `msrp_cents` is the official price, used to calculate discounts. |
+| **products** | id, slug, title, platform, region, genre, description, image_url, msrp_cents, release_date, sales_count | One row = one sellable variant, e.g. "Elden Ring (PC) Steam Key GLOBAL". Like Eneba, platform and region are part of the product. `msrp_cents` is the official price, used to calculate discounts. `sales_count` = popularity (best sellers, search tie-breaks). |
 | **sellers** | id, name, rating_percent, sales_count | Fake marketplace sellers. |
 | **offers** | id, product_id → products, seller_id → sellers, price_cents | One seller's price for one product. UNIQUE(product_id, seller_id). |
 | **game_keys** | id, offer_id → offers, code, status (`available`/`sold`), order_item_id → order_items (nullable) | Pre-generated keys. **Stock = number of available keys.** A key is assigned to a buyer only after payment. |
@@ -90,6 +92,7 @@ All paths start with `/api`. All bodies are JSON. 🔒 = needs `Authorization: B
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
 | GET | `/health` | Is the server running? Used by Render. | – |
+| GET | `/covers/{slug}.svg` | Generated placeholder cover image (gradient + name + platform badge) | – |
 | **Homepage** ||||
 | GET | `/home/blocks` | Ordered list of blocks: type, title, endpoint to call | – |
 | GET | `/home/banners` | Banner slides | – |
@@ -176,7 +179,9 @@ Everything else (homepage, product page, auth) is done properly but without extr
 | Keys are pre-generated fake strings | Real keys come from publishers. Stock = available keys keeps the logic realistic. |
 | No admin panel | Content (banners, blocks) is changed in the seed data. Out of scope for 7 days. |
 | Render free tier sleeps after inactivity | First request after idle can take ~30–60 s. README will warn reviewers. |
-| Eneba-like look, not a copy | Similar colors, spacing and components; own logo and placeholder images. We don't copy their assets. |
+| Eneba-like look, not a copy | Similar colors, spacing and components; own logo. We don't copy their assets. |
+| Generated SVG covers instead of game art | We have no rights to publisher art. Covers are drawn by our API, so there's no external image host that could break during review. |
+| CGO SQLite driver | Needs a C compiler at build time (Render has one). In exchange: the most battle-tested Go SQLite driver. |
 | Few dependencies | Every line must be explainable in an interview. |
 
 ---
