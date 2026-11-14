@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Rati0ed/eneba-marketplace/backend/db"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // newTestHandler gives each test its own freshly seeded database.
@@ -22,7 +23,8 @@ func newTestHandler(t *testing.T) *Handler {
 	if err != nil {
 		t.Fatalf("search index: %v", err)
 	}
-	return &Handler{DB: database, Search: index}
+	bcryptCost = bcrypt.MinCost // tests don't need slow hashing; keeps the test run fast
+	return &Handler{DB: database, Search: index, JWTSecret: []byte("test-secret-that-is-at-least-32-bytes!")}
 }
 
 // listResponse is the JSON shape of GET /api/products.

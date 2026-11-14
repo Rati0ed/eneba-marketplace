@@ -11,12 +11,13 @@ import (
 	"github.com/Rati0ed/eneba-marketplace/backend/search"
 )
 
-// Handler holds what every handler needs: the database and the search index.
+// Handler holds what every handler needs: the database, the search index and the JWT secret.
 // Handlers are methods on it, so they can use h.DB and h.Search without global variables.
 // Python comparison: like a class with self.db, where each endpoint is a method.
 type Handler struct {
-	DB     *sql.DB
-	Search *search.Index // in-memory typo-tolerant search, built at startup
+	DB        *sql.DB
+	Search    *search.Index // in-memory typo-tolerant search, built at startup
+	JWTSecret []byte        // key that signs login tokens; from the JWT_SECRET env variable
 }
 
 // writeJSON sends any Go value as a JSON response with the given status code.
@@ -38,4 +39,16 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func serverError(w http.ResponseWriter, err error) {
 	log.Printf("internal error: %v", err)
 	writeError(w, http.StatusInternalServerError, "something went wrong")
+}
+
+// readJSON decodes the request body into `into`. On failure it answers 400 itself and
+// returns false, so handlers can simply do: if !readJSON(w, r, &body) { return }
+func readJSON(w http.ResponseWriter, r *http.Request, into any) bool {
+	// Limit the body to 64 KB: nobody can tie up the server by sending a gigantic request.
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := json.NewDecoder(r.Body).Decode(into); err != nil {
+		writeError(w, http.StatusBadRequest, "the request body must be valid JSON")
+		return false
+	}
+	return true
 }

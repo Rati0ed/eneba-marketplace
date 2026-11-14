@@ -28,5 +28,13 @@ func (h *Handler) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/home/best-sellers", h.HomeBestSellers)
 	mux.HandleFunc("GET /api/home/deals", h.HomeDeals)
 
+	// Accounts. h.RequireAuth(...) wraps a handler so only logged-in users reach it.
+	mux.HandleFunc("POST /api/auth/register", h.Register)
+	mux.HandleFunc("POST /api/auth/login", h.Login)
+	mux.HandleFunc("GET /api/auth/me", h.RequireAuth(h.Me))
+
+	// Cart: public, so guests can see prices before signing in.
+	mux.HandleFunc("POST /api/cart/quote", h.CartQuote)
+
 	return mux
 }

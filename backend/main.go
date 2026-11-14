@@ -2,6 +2,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"log"
 	"net/http"
 	"os"
@@ -18,11 +19,19 @@ func main() {
 	port := getEnv("PORT", "8080")
 	allowedOrigin := getEnv("ALLOWED_ORIGIN", "http://localhost:5173") // Vite's dev server
 	dbPath := getEnv("DB_PATH", "data.db")
-	jwtSecret := getEnv("JWT_SECRET", "")
-	if jwtSecret == "" {
-		// Not used until Day 5 (login). A missing secret in production would be a security hole,
-		// so we warn loudly now and will refuse to start once auth exists.
-		log.Println("WARNING: JWT_SECRET is not set")
+	jwtSecret := []byte(getEnv("JWT_SECRET", ""))
+	if len(jwtSecret) == 0 {
+		// No secret configured (local development): make a random one for this run.
+		// Tokens then stop working after a restart, which is fine: the database is re-created
+		// on restart anyway, so the accounts they belong to are gone too.
+		jwtSecret = make([]byte, 32)
+		if _, err := rand.Read(jwtSecret); err != nil {
+			log.Fatalf("generate JWT secret: %v", err)
+		}
+		log.Println("WARNING: JWT_SECRET is not set; using a random secret for this run")
+	} else if len(jwtSecret) < 32 {
+		// HS256 keys should be at least 256 bits (32 bytes); a short secret can be brute-forced.
+		log.Println("WARNING: JWT_SECRET is shorter than 32 characters; use a long random value")
 	}
 
 	database, err := db.Open(dbPath)
@@ -37,7 +46,7 @@ func main() {
 		log.Fatalf("search index: %v", err)
 	}
 
-	h := &handlers.Handler{DB: database, Search: searchIndex}
+	h := &handlers.Handler{DB: database, Search: searchIndex, JWTSecret: jwtSecret}
 
 	// All URL -> handler mappings are in handlers/routes.go.
 	mux := h.Routes()
