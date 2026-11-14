@@ -78,6 +78,16 @@ var aliases = map[string]string{
 	"fifa":   "ea sports fc",
 	"acnh":   "animal crossing new horizons",
 	"cp2077": "cyberpunk 2077",
+	"gta5":   "grand theft auto v",
+	"gtav":   "grand theft auto v",
+	"fifa25": "ea sports fc 25",
+	"mc":     "minecraft",
+	"sdv":    "stardew valley",
+	"hk":     "hollow knight",
+	"fh5":    "forza horizon 5",
+	"sot":    "sea of thieves",
+	"d4":     "diablo iv",
+	"gt7":    "gran turismo 7",
 }
 
 // expandAliases: ["gta", "5"] -> ["grand", "theft", "auto", "5"].

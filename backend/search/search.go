@@ -128,40 +128,111 @@ func (idx *Index) Search(query string, limit int) []Result {
 	return results
 }
 
-// Closest finds the product whose title is "least far" from the query, even when Search
-// found nothing. Used for "Did you mean ...?". ok=false if nothing is reasonably close.
+// Closest finds the product the user most likely MEANT when Search found nothing.
+// Used for "Did you mean ...?". ok=false if nothing is reasonably close.
+//
+// It only runs when there are zero results, so it can be much more forgiving than Search:
+//   - short words may have a typo too ("gpa" ~ "gta"),
+//   - nicknames are matched with a typo as well ("rdr3" ~ "rdr2", "cdo" ~ "cod"),
+//   - words typed without vowels match the consonants of a title word ("mncrft" ~ "minecraft").
+//
+// Each product gets a COST: for every query word, how many edits it is away from the
+// best-matching title word (or nickname). The cheapest product wins, if the cost is at most
+// half the number of letters typed. Ties: a nickname match wins, then the more popular product.
 func (idx *Index) Closest(query string) (id int64, ok bool) {
-	queryWords := expandAliases(normalize(query))
+	// No alias expansion here: closestWordCost matches nicknames itself, typos included.
+	queryWords := normalize(query)
 	if len(queryWords) == 0 {
 		return 0, false
 	}
-
-	bestCost, bestPopularity := -1, 0
 	queryLetters := 0
 	for _, qw := range queryWords {
 		queryLetters += len([]rune(qw))
 	}
 
+	found := false
+	bestCost, bestPopularity, bestViaAlias := 0, 0, false
 	for _, doc := range idx.docs {
-		// Cost = for each query word, the edit distance to the most similar title word.
-		cost := 0
+		cost, viaAlias := 0, false
 		for _, qw := range queryWords {
-			minDist := len([]rune(qw)) // worst case: replace every letter
-			for _, tw := range doc.words {
-				if d := editDistance(qw, tw); d < minDist {
-					minDist = d
-				}
-			}
-			cost += minDist
+			c, alias := closestWordCost(qw, doc.words)
+			cost += c
+			viaAlias = viaAlias || alias
 		}
-		// Lowest cost wins; on a tie, the more popular product.
-		if bestCost == -1 || cost < bestCost || (cost == bestCost && doc.Popularity > bestPopularity) {
-			bestCost, bestPopularity, id = cost, doc.Popularity, doc.ID
+
+		better := !found ||
+			cost < bestCost ||
+			(cost == bestCost && viaAlias && !bestViaAlias) || // "re5" -> Resident Evil 4 (nickname), not "Red" Dead
+			(cost == bestCost && viaAlias == bestViaAlias && doc.Popularity > bestPopularity)
+		if better {
+			found, id = true, doc.ID
+			bestCost, bestPopularity, bestViaAlias = cost, doc.Popularity, viaAlias
 		}
 	}
 
-	// Only suggest if less than half of the letters needed changing; otherwise it's a guess.
-	return id, bestCost >= 0 && bestCost*2 < queryLetters
+	// At most one edit per two letters typed; otherwise it's a guess, not a suggestion.
+	return id, found && bestCost*2 <= queryLetters
+}
+
+// closestWordCost: how many edits is ONE query word away from this product?
+// It tries three ways and keeps the cheapest. viaAlias reports whether a nickname won.
+func closestWordCost(queryWord string, titleWords []string) (cost int, viaAlias bool) {
+	cost = len([]rune(queryWord)) // worst case: every letter is wrong
+
+	// 1. Plain edit distance to each title word (short words included: 1 typo in "gya" is fine here).
+	for _, tw := range titleWords {
+		cost = min(cost, editDistance(queryWord, tw))
+	}
+
+	// 2. Typed without vowels: "mncrft" vs the consonants of "minecraft" ("mncrft") = 0 edits.
+	if !hasVowel(queryWord) {
+		for _, tw := range titleWords {
+			if skeleton := consonants(tw); len(skeleton) >= 2 {
+				cost = min(cost, editDistance(queryWord, skeleton))
+			}
+		}
+	}
+
+	// 3. Nicknames with a typo: "gpa" is 1 edit from "gta" -> compare "grand theft auto" instead.
+	//    Cost = typos in the nickname + how far each of its words is from this title.
+	for nickname, expansion := range aliases {
+		allowed := 0
+		if len(nickname) >= 3 {
+			allowed = 1 // "ff" or "gow" must be exact or nearly; 2-letter nicknames exactly
+		}
+		d := editDistance(queryWord, nickname)
+		if d > allowed {
+			continue
+		}
+		c := d
+		for _, word := range strings.Fields(expansion) {
+			best := len([]rune(word))
+			for _, tw := range titleWords {
+				best = min(best, editDistance(word, tw))
+			}
+			c += best
+		}
+		// On a tie with a plain word match, count it as a nickname match (stronger signal).
+		if c <= cost {
+			cost, viaAlias = c, true
+		}
+	}
+	return cost, viaAlias
+}
+
+// hasVowel: "mncrft" -> false, "minecraft" -> true.
+func hasVowel(word string) bool {
+	return strings.ContainsAny(word, "aeiou")
+}
+
+// consonants removes vowels: "minecraft" -> "mncrft", "pokemon" -> "pkmn".
+func consonants(word string) string {
+	return strings.Map(func(r rune) rune {
+		if strings.ContainsRune("aeiou", r) {
+			return -1 // -1 = drop this character
+		}
+		return r
+	}, word)
 }
 
 // bestWordScore = the best way ONE query word matches ANY title word (0 = no match).

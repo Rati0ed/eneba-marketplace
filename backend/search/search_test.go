@@ -24,6 +24,9 @@ var testDocs = []Document{
 	{18, "Starfield (PC) Steam Key GLOBAL", 5200},
 	{19, "Final Fantasy VII Rebirth (PS5) PSN Key EUROPE", 4600},
 	{20, "Mario Kart 8 Deluxe (Switch) Nintendo eShop Key EUROPE", 7600},
+	{21, "Hades (PC) Steam Key GLOBAL", 5100},
+	{22, "Resident Evil 4 (PC) Steam Key GLOBAL", 5700},
+	{23, "Ghost of Tsushima Director's Cut (PC) Steam Key GLOBAL", 5600},
 }
 
 // The typo table: what people really type -> the product that must come FIRST.
@@ -134,21 +137,79 @@ func TestSearchFiltersAndLimits(t *testing.T) {
 	}
 }
 
-func TestClosestSuggestsSomethingSensible(t *testing.T) {
+// "Did you mean": what the user SEES FIRST for short, abbreviated or mistyped queries.
+// If Search finds something, its first result counts; if not, the Closest suggestion does.
+// (Search is strict on purpose; Closest only runs on zero results, so it can be forgiving.)
+func TestWhatTheUserSeesFirst(t *testing.T) {
 	idx := NewIndex(testDocs)
 
-	// Too many typos for Search ("ded" is 3 letters, so it must be exact)...
-	if len(idx.Search("red ded redemtion", 0)) != 0 {
-		t.Skip("search became more tolerant; pick another example")
+	cases := []struct {
+		query  string
+		wantID int64
+		why    string
+	}{
+		// Reported from testing the live site:
+		{"gpa", 5, "nickname 'gta' with a typo"},
+		{"gya", 5, "nickname 'gta' with a typo"},
+		// More short / abbreviated queries:
+		{"gta5", 5, "nickname written together with the number"},
+		{"gtav", 5, "nickname + Roman numeral, together"},
+		{"rdr3", 11, "nickname with a wrong number"},
+		{"rdt2", 11, "nickname with a typo"},
+		{"cdo", 12, "nickname 'cod' with swapped letters"},
+		{"cdo black ops", 12, "nickname typo + correct words"},
+		{"bg4", 6, "nickname with a wrong number"},
+		{"ff8", 19, "closest Final Fantasy we sell"},
+		{"mk9", 20, "nickname with a wrong number"},
+		{"re5", 22, "nickname 're4' beats the word 'Red' (Red Dead)"},
+		{"hds", 21, "typed without vowels"},
+		{"mncrft", 13, "typed without vowels"},
+		{"pkmn", 9, "typed without vowels"},
+		{"red ded redemtion", 11, "3-letter typo + long typo"},
+		{"wichr", 4, "too many typos for Search, close enough for a suggestion"},
 	}
-	// ...but Closest still finds what was meant.
-	if id, ok := idx.Closest("red ded redemtion"); !ok || id != 11 {
-		t.Errorf("Closest = %d, %v; want 11, true", id, ok)
+	for _, c := range cases {
+		var got int64
+		how := "search"
+		if results := idx.Search(c.query, 1); len(results) > 0 {
+			got = results[0].ID
+		} else if id, ok := idx.Closest(c.query); ok {
+			got, how = id, "did you mean"
+		}
+		if got != c.wantID {
+			t.Errorf("%q (%s): user sees %d via %s, want %d", c.query, c.why, got, how, c.wantID)
+		}
 	}
+}
 
-	// Random letters shouldn't produce a confident suggestion.
-	if id, ok := idx.Closest("qwrtzpx"); ok {
-		t.Errorf("Closest(qwrtzpx) suggested %d", id)
+func TestClosestDoesNotGuessWildly(t *testing.T) {
+	idx := NewIndex(testDocs)
+	for _, query := range []string{"xyz", "zzz", "qwrtzpx", "dog", "hlo", "asdfgh", ""} {
+		if id, ok := idx.Closest(query); ok {
+			t.Errorf("Closest(%q) suggested %d, want nothing", query, id)
+		}
+	}
+}
+
+func TestShortWordsStayStrictInSearch(t *testing.T) {
+	// Search itself must NOT accept typos in short words, or "god" would find Call of Duty.
+	idx := NewIndex(testDocs)
+	for _, query := range []string{"gpa", "cdo", "hds"} {
+		if results := idx.Search(query, 0); len(results) != 0 {
+			t.Errorf("Search(%q) found %d results; short words must match exactly", query, len(results))
+		}
+	}
+	if results := idx.Search("god", 1); len(results) == 0 || results[0].ID != 14 {
+		t.Errorf("'god' should find God of War, got %v", results)
+	}
+}
+
+func TestConsonants(t *testing.T) {
+	if got := consonants("minecraft"); got != "mncrft" {
+		t.Errorf("consonants(minecraft) = %q", got)
+	}
+	if hasVowel("pkmn") || !hasVowel("pokemon") {
+		t.Error("hasVowel is wrong")
 	}
 }
 

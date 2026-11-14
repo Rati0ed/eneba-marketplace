@@ -75,12 +75,24 @@ func TestSuggestTotalAndEmptyQuery(t *testing.T) {
 
 func TestSuggestDidYouMean(t *testing.T) {
 	h := newTestHandler(t)
-	_, res := getSuggest(t, h, "red ded redemtion")
-	if len(res.Items) != 0 {
-		t.Skip("search now finds this directly")
+	// Through the real API and catalog: zero results, but a sensible "did you mean".
+	cases := map[string]string{ // query -> suggested slug must start with this
+		"red ded redemtion": "red-dead-redemption-2",
+		"gpa":               "grand-theft-auto-v",
+		"gya":               "grand-theft-auto-v",
+		"rdr3":              "red-dead-redemption-2",
+		"mncrft":            "minecraft",
+		"re5":               "resident-evil-4",
 	}
-	if res.Suggestion == nil || !strings.HasPrefix(res.Suggestion.Slug, "red-dead-redemption-2") {
-		t.Errorf("suggestion = %+v, want Red Dead Redemption 2", res.Suggestion)
+	for query, wantPrefix := range cases {
+		_, res := getSuggest(t, h, query)
+		if len(res.Items) != 0 {
+			t.Errorf("%q: expected 0 search results (so 'did you mean' is used), got %d", query, len(res.Items))
+			continue
+		}
+		if res.Suggestion == nil || !strings.HasPrefix(res.Suggestion.Slug, wantPrefix) {
+			t.Errorf("%q: suggestion = %+v, want %s...", query, res.Suggestion, wantPrefix)
+		}
 	}
 }
 
