@@ -135,7 +135,7 @@ How it works (`backend/search/`, our own code, no search engine; built and teste
    - Allowed typos grow with word length: **1–3 letters: 0, 4–6: 1, 7+: 2**. Short words must be exact, otherwise `cod`/`god`/`cat` match each other.
 5. +5 bonus if the title starts with the query. Sort by score; ties → more popular product.
 6. Results under **half of the best score are dropped**, so `star` shows Stardew Valley and Starfield but not "Pokémon **Scar**let".
-7. Nothing matched → **"Did you mean"**: the product with the smallest total edit distance, if under half the letters differ.
+7. Nothing matched → **"Did you mean"** (`Closest`). It only runs on zero results, so it is more forgiving than Search: short words may have a typo, nicknames match with one typo (`gpa` ~ `gta`, `rdr3` ~ `rdr2`), and words typed without vowels match title consonants (`mncrft` ~ `minecraft`). Cheapest product wins if its cost ≤ half the letters typed; ties → nickname match, then popularity. *Improved on Day 7 after live testing showed `gpa`/`gya` suggested nothing.*
 8. The index is built **in memory at startup** (80 products), so search costs no database queries.
 
 Where it's used:
@@ -205,7 +205,7 @@ Everything else (homepage, product page, auth) is done properly but without extr
 
 ## 6. Seven-day plan
 
-Status: Days 1–6 built, tested and deployed by Sat 14 Nov; Day 7 (polish, README, final checks) and the code review session follow.
+Status: Days 1–7 built, tested and deployed by Sat 14 Nov (ahead of the Mon 16 Nov goal). Tue 17 Nov: code review session. Submission before Wed 18 Nov 11:45.
 
 | Day | Goal | Done when |
 |---|---|---|

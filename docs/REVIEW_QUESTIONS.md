@@ -136,3 +136,16 @@ Files: `frontend/src/pages/CheckoutPage.tsx`, `frontend/src/pages/OrderPage.tsx`
 2. **`CheckoutPage.tsx`**: explain the bug where buyers landed on `/cart` after paying, and how `paidOrderId` fixes it.
 3. **`CheckoutPage.tsx`**: what are the two layers that stop a double-click from paying twice?
 4. **`KeyBox.tsx`**: why are keys hidden by default, and what happens if the clipboard is blocked?
+
+---
+
+## Day 7: Polish
+Files: `backend/search/search.go` (`Closest`, `closestWordCost`), `backend/search/search_test.go`, `backend/db/demo.go`, `e2e/smoke.cjs`, `frontend/src/components/Footer.tsx`
+
+1. **`search.go`**: why can "Did you mean" allow typos in 3-letter words when Search can't? What would break if Search allowed them?
+2. **`search.go` → `closestWordCost`**: explain the three ways a query word can match: plain typo, no vowels, nickname. Walk through `gpa` → Grand Theft Auto V.
+3. **`search.go` → `Closest`**: why did `re5` suggest Red Dead Redemption before the fix, and which rule fixed it?
+4. **`search.go`**: Go visits map entries in random order. Why doesn't that make `Closest` give different answers on different runs?
+5. **`db/demo.go`**: why does the demo order take keys from real stock instead of inserting made-up keys?
+6. **`e2e/smoke.cjs`**: what does an end-to-end test catch that the 42 Go tests can't? Why did we run it once with the backend switched off?
+7. **README → Known limitations**: a reviewer creates an account at 10:00 and comes back at 11:00. What might they see, and why?

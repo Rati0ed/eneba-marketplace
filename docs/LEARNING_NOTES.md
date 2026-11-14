@@ -791,3 +791,31 @@ After payment we empty the cart, and the checkout page has a rule "empty cart �
 
 ### Masking secrets in the UI
 Keys show as `•••••-•••••-•••••` until "Reveal", because people share screenshots. `code.replace(/[^-]/g, '•')` replaces every character except dashes.
+
+---
+
+## Day 7: Polish
+
+### Strict search, forgiving fallback
+Two different jobs, two different rules (`backend/search/search.go`):
+- **Search** must be precise: a 3-letter word with 1 typo matches too much (`cod` → `god`), so short words must be exact.
+- **Closest ("Did you mean")** only runs when Search found **nothing**, so a wrong guess costs little and a good guess helps a lot. It allows typos in short words, matches nicknames with a typo (`gpa` → `gta`) and compares vowel-less typing with a word's consonants (`mncrft` vs `consonants("minecraft")` = `mncrft`).
+Found by testing the live site. A probe of 40 short queries showed most suggested nothing, and `re5` suggested Red Dead instead of Resident Evil 4. Now each one is a line in the test table.
+
+### Tie-breaking
+When two products cost the same, `Closest` prefers a nickname match (a strong signal: the user typed something like `re5`), then the more popular product. Without that rule, `re5` → "**Re**d Dead" won only because it sells more.
+
+### Map iteration order in Go
+`for k, v := range aliases` visits a map in a **random order** each run (Go does this on purpose, so code can't depend on it). The nickname loop is written so the result is the same in any order: it keeps the minimum cost. We ran the tests 30 times to check.
+
+### Seed data that behaves like real data
+The demo account's order isn't faked with hard-coded keys: `db/demo.go` takes real keys from stock, marks them sold and links them to order lines, exactly like `completeOrder`. So the demo order, stock counts and order pages all stay consistent, and a test checks it (`total_cents` = sum of lines).
+
+### End-to-end (E2E) test
+`e2e/smoke.cjs` drives a real Chromium browser through the main journeys with Playwright and `node:assert`. If any check fails, it exits with code 1, so a script or CI can tell. Unit tests prove the parts work; E2E proves they work **together** (frontend + API + database + browser). `BASE_URL=...` points it at the live site. We also checked that it really fails when the API is down: a test that can't fail proves nothing.
+
+### Honest UI
+A footer and a "Demo keys, not redeemable" note on order pages: the site looks like a real shop, so it must say clearly that it isn't one (no real payments, no real keys, not affiliated with Eneba).
+
+### Responsive check
+Every page was opened at 390 px and 320 px wide, checking `document.documentElement.scrollWidth > window.innerWidth` (any sideways scrolling) and looking at screenshots. Fixes: card numbers no longer wrap mid-number (`white-space: nowrap`), and key rows fit on one line.
