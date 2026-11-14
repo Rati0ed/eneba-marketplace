@@ -36,5 +36,11 @@ func (h *Handler) Routes() *http.ServeMux {
 	// Cart: public, so guests can see prices before signing in.
 	mux.HandleFunc("POST /api/cart/quote", h.CartQuote)
 
+	// Orders: login required. Each handler only ever sees the logged-in user's own orders.
+	mux.HandleFunc("POST /api/orders", h.RequireAuth(h.CreateOrder))
+	mux.HandleFunc("GET /api/orders", h.RequireAuth(h.ListOrders))
+	mux.HandleFunc("GET /api/orders/{id}", h.RequireAuth(h.GetOrder))
+	mux.HandleFunc("POST /api/orders/{id}/pay", h.RequireAuth(h.PayOrder))
+
 	return mux
 }
