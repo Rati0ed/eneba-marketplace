@@ -177,3 +177,25 @@
   border-radius: 4px;
   padding: 2px 6px;
 }
+
+/* Phones: the key gets its own full-width line, the tag and buttons go on the line below. */
+@media (max-width: 560px) {
+  .key-code {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .key-demo-tag {
+    margin-right: auto; /* pushes the buttons to the right */
+  }
+  .order-item {
+    gap: 10px;
+    padding: 12px;
+  }
+  .order-item img {
+    width: 40px;
+    height: auto;
+  }
+  .key-box .btn-small {
+    padding: 7px 11px;
+  }
+}

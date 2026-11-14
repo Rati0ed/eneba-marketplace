@@ -93,3 +93,11 @@
     order: -1; /* summary above the form on phones */
   }
 }
+
+.test-card {
+  flex-wrap: wrap; /* on narrow screens the label moves under the number */
+}
+
+.test-card code {
+  white-space: nowrap; /* never break a card number in the middle */
+}
