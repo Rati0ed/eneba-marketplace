@@ -39,6 +39,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", h.Health)
 	mux.HandleFunc("GET /api/products", h.ListProducts)
+	mux.HandleFunc("GET /api/products/filters", h.ProductFilters)
 	mux.HandleFunc("GET /api/covers/{file}", h.Cover)
 
 	// Wrap the router in middleware: Logging runs first, then CORS, then the route's handler.
