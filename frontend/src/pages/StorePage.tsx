@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { fetchProductFilters, fetchProducts, type ProductFilters, type ProductList } from '../api'
 import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
 import FilterSidebar from '../components/FilterSidebar'
@@ -110,6 +110,14 @@ export default function StorePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function clearSearch() {
+    updateParams((params) => {
+      params.delete('q')
+      // "Best match" only makes sense with a search; go back to the default sort.
+      if (params.get('sort') === 'relevance') params.delete('sort')
+    })
+  }
+
   // Remove every filter but keep the search text (if any).
   function clearFilters() {
     const q = searchParams.get('q')
@@ -126,6 +134,7 @@ export default function StorePage() {
 
   // Chips above the grid: one per active filter, each removable with ×.
   const chips: { label: string; remove: () => void }[] = []
+  if (query) chips.push({ label: `“${query}”`, remove: clearSearch })
   for (const key of LIST_FILTERS) {
     for (const value of selected[key]) chips.push({ label: value, remove: () => toggleFilter(key, value) })
   }
@@ -169,6 +178,8 @@ export default function StorePage() {
             <label className="sort-select">
               <span>Sort by</span>
               <select value={result?.sort ?? searchParams.get('sort') ?? 'popular'} onChange={(e) => setSort(e.target.value)}>
+                {/* "Best match" is only offered while searching. */}
+                {query && <option value="relevance">Best match</option>}
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -185,9 +196,11 @@ export default function StorePage() {
                   {chip.label} <span aria-hidden="true">×</span>
                 </button>
               ))}
-              <button className="link-button" onClick={clearFilters}>
-                Clear filters
-              </button>
+              {chips.length > (query ? 1 : 0) && (
+                <button className="link-button" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              )}
             </div>
           )}
 
@@ -214,12 +227,31 @@ export default function StorePage() {
             </div>
           ) : result && result.items.length === 0 ? (
             <div className="empty-state">
-              <h2>No products found</h2>
-              <p className="muted">Try removing some filters or widening the price range.</p>
+              <h2>{query ? `No results for “${query}”` : 'No products found'}</h2>
+              {result.suggestion ? (
+                <p>
+                  Did you mean{' '}
+                  <Link to={`/product/${result.suggestion.slug}`} className="suggestion-link">
+                    {result.suggestion.title}
+                  </Link>
+                  ?
+                </p>
+              ) : (
+                <p className="muted">
+                  {query ? 'Check the spelling or try a shorter name.' : 'Try removing some filters or widening the price range.'}
+                </p>
+              )}
               <div className="empty-actions">
-                <button className="btn btn-primary" onClick={clearFilters}>
-                  Clear filters
-                </button>
+                {query && (
+                  <button className="btn btn-primary" onClick={clearSearch}>
+                    Clear search
+                  </button>
+                )}
+                {chips.length > (query ? 1 : 0) && (
+                  <button className={query ? 'btn btn-secondary' : 'btn btn-primary'} onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                )}
               </div>
             </div>
           ) : (

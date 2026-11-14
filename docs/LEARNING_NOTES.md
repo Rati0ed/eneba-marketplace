@@ -89,15 +89,7 @@ Filling the database with sample data at startup so the app has something to sho
 
 ## Algorithms
 
-### Levenshtein distance
-The minimum number of single-letter edits (insert, delete, replace) to turn one word into another.
-- `cyberpnk` → `cyberpunk`: 1 edit (insert `u`).
-- `wticher` → `witcher`: 2 edits in plain Levenshtein (replace `t`→`i`, then `i`→`t`).
-- **Damerau-Levenshtein** adds one rule: swapping two neighbouring letters = 1 edit. With it, `wticher` → `witcher` is 1. We use this variant.
-Our search accepts small distances, so typos still find the right game.
-
-### Debounce
-Wait until the user stops typing (250 ms) before calling the API, instead of sending a request on every key press.
+See **Day 3: Search** below for edit distance, debounce and the full search algorithm.
 
 ---
 
@@ -511,3 +503,80 @@ Grey placeholder cards with the same size as real ones (`ProductCardSkeleton`). 
 - **`-webkit-line-clamp: 2`**: titles cut to 2 lines with "…".
 - **`:focus-visible`**: a yellow outline for keyboard users only. Accessibility.
 - **`prefers-reduced-motion`**: turns off animations for users who disabled them in their OS.
+
+---
+
+## Day 3: Search (backend)
+
+### Edit distance (Damerau-Levenshtein)
+The fewest single-letter edits to turn one word into another. Our edits: **insert, delete, replace, swap two neighbours** (`search/search.go`, `editDistance`).
+- `eldn` → `elden`: 1 (insert e)
+- `wticher` → `witcher`: 1 (swap t,i). Plain Levenshtein says 2; swaps are the most common typing mistake, so we count them as 1.
+- `kitten` → `sitting`: 3
+
+**How it's computed: dynamic programming.** Fill a table where `dist[i][j]` = distance between the first `i` letters of word A and the first `j` letters of word B. Each cell is the cheapest of:
+```
+dist[i-1][j] + 1          delete a letter
+dist[i][j-1] + 1          insert a letter
+dist[i-1][j-1] + 0 or 1   keep (same letter) or replace
+dist[i-2][j-2] + 1        swap (if the last two letters are swapped)
+```
+The bottom-right cell is the answer. Cost: `len(A) × len(B)` steps, tiny for words.
+
+### Runes vs bytes
+In Go a `string` is bytes. `"é"` is 2 bytes but 1 letter. `[]rune("pokémon")` splits into real letters, so the distance between `pokémon` and `pokemon` is 1, not 2. Python 3 strings are already letters, so Python doesn't have this problem.
+
+### Tokenizing and normalizing
+Turning text into comparable words: lowercase, remove accents, split on anything that's not a letter or digit (`strings.FieldsFunc` + `unicode.IsLetter`). Both the titles and the query go through the **same** `normalize`, so they're comparable.
+
+### Scoring and ranking
+Each query word gets points for its best match (exact 10, prefix 7, 1 typo 5, ...). Every word must match (**AND**), otherwise the product is out. Sort by total score, ties by popularity (`sort.Slice` with a custom "less" function).
+Results under half the best score are dropped: precision matters as much as tolerance. A search that returns everything is as useless as one that returns nothing.
+
+### In-memory index
+`search.NewIndex` pre-processes every title once at startup. Each search loops over 80 products in microseconds. A real shop with millions of products would use a search engine (Elasticsearch, Meilisearch) with an inverted index; for 80 products that would be extra infrastructure for no benefit.
+
+### Pure package = easy tests
+The `search` package doesn't know about HTTP or SQL: titles in, IDs out. So its tests need no database. The test table in `search_test.go` is the **spec**: each line is "what people type" → "what must come first".
+
+### Ordering SQL rows by our own ranking
+The search decides the order, but SQL fetches the rows. `relevanceOrder` builds:
+```sql
+ORDER BY CASE id WHEN ? THEN 0 WHEN ? THEN 1 WHEN ? THEN 2 END
+```
+with the product ids as values, so SQL returns them in search order while still applying filters and pages.
+
+---
+
+## Day 3: Search (frontend)
+
+### Debounce
+Wait until the user stops typing for 250 ms, then search once (`SearchBar.tsx`):
+```ts
+useEffect(() => {
+  const timer = setTimeout(() => fetchSuggestions(query, ...), 250)
+  return () => { clearTimeout(timer); controller.abort() }   // cleanup
+}, [query])
+```
+Every keystroke changes `query`, so React runs the cleanup (cancel the previous timer) and starts a new timer. Only the last one survives. Typing `elden` = **1 request** instead of 5 (the browser test checks this).
+
+### useRef
+`useRef` gives direct access to a DOM element: `inputRef.current?.blur()` removes focus from the input (closing the phone keyboard). Unlike state, changing a ref doesn't re-render.
+
+### Keyboard navigation
+`activeIndex` remembers the highlighted result (-1 = none). ↓ adds 1, ↑ subtracts 1, and `%` (modulo) wraps around: `(index + 1) % length`. Enter opens the highlighted product, or searches the store if none is highlighted. `event.preventDefault()` stops the browser's default action (moving the cursor, submitting the form, clearing the search box on Esc).
+
+### Blur vs click (onMouseDown + preventDefault)
+Clicking a result would first blur the input, closing the dropdown **before** the click lands. `onMouseDown={(e) => e.preventDefault()}` on the dropdown keeps focus in the input, so the click works.
+
+### ARIA combobox
+Attributes that tell screen readers what's going on: `role="combobox"` on the input, `role="listbox"` and `role="option"` on the list, `aria-expanded` (is the list open?), `aria-activedescendant` (which option is highlighted). The browser test checks `aria-activedescendant` follows the arrow keys.
+
+### Escaping user input in a regular expression
+`Highlight.tsx` builds a RegExp from the user's words. Characters like `+ ( [ .` mean something in a regex, so `c++ (pc` would crash the page. We escape them first: `word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`. Same principle as SQL placeholders and HTML escaping: **user input must never be treated as code**, in any language.
+
+### URL-encoding
+`new URLSearchParams({ q: 'gta 5 & more' })` → `q=gta+5+%26+more`. Raw `&` would start a new parameter. Never glue user text into a URL by hand.
+
+### Resetting a component with `key` (again)
+`<SearchBar key={urlQuery} initialQuery={urlQuery} />` in `Header.tsx`: when the URL's `?q=` changes (a new search, or the back button), the search bar is re-created with the new text and a closed dropdown. Same trick as the price filter on Day 2.

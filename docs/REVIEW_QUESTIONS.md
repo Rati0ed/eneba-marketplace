@@ -55,3 +55,24 @@ Files: `frontend/src/pages/StorePage.tsx`, `frontend/src/components/FilterSideba
 3. **`StorePage.tsx`**: what bug would appear without `controller.abort()` in the effect cleanup if the user clicks two filters quickly?
 4. **`FilterSidebar.tsx`**: why do the price inputs only update the URL on "Apply", and what does `key={`${minPrice}-${maxPrice}`}` do?
 5. **`vercel.json`**: what happens on the live site if you refresh `/store?platform=Steam` without the rewrite rule?
+
+---
+
+## Day 3: Search (backend)
+Files: `backend/search/search.go`, `backend/search/words.go`, `backend/search/search_test.go`, `backend/handlers/search.go`, `backend/handlers/products.go`
+
+1. **`search.go`**: what is the edit distance between `wticher` and `witcher` in our algorithm, and why is it different from plain Levenshtein?
+2. **`search.go` → `allowedTypos`**: why does a 3-letter word get 0 allowed typos? Give an example of what would go wrong with 1.
+3. **`words.go`**: how does `spiderman` find "Marvel's Spider-Man 2", and how does `gta 5` find "Grand Theft Auto V"? (Two different mechanisms.)
+4. **`search.go`**: why do we drop results that score under half of the best one? Which test shows the problem it fixes?
+5. **`handlers/products.go`**: with `?q=elden&platform=PlayStation&sort=price_asc`, which part does the search index do, and which part does SQL do?
+6. **`search.go`**: why do we use `[]rune(word)` instead of `len(word)` when measuring words?
+
+## Day 3: Search (frontend)
+Files: `frontend/src/components/SearchBar.tsx`, `frontend/src/components/Highlight.tsx`, `frontend/src/components/Header.tsx`
+
+1. **`SearchBar.tsx`**: explain how the debounce works using only `setTimeout`, `clearTimeout` and the effect cleanup. How many requests does typing "elden" quickly send?
+2. **`SearchBar.tsx`**: why does the dropdown have `onMouseDown={(e) => e.preventDefault()}`? What breaks without it?
+3. **`SearchBar.tsx`**: what happens on Enter (a) with a result highlighted, (b) with nothing highlighted?
+4. **`Highlight.tsx`**: what would happen if a user typed `c++ (pc` and we didn't escape the regex characters?
+5. **`Header.tsx`**: what does `key={urlQuery}` on `<SearchBar>` achieve when the user presses the browser's back button?

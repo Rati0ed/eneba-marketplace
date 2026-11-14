@@ -103,7 +103,7 @@ All paths start with `/api`. All bodies are JSON. 🔒 = needs `Authorization: B
 | GET | `/products/filters` | Platforms, regions and genres with product counts, plus the price range, so filter options are not hardcoded | – |
 | GET | `/products/{slug}` | Product details | – |
 | GET | `/products/{slug}/offers` | All seller offers for it, cheapest first, with stock | – |
-| GET | `/search/suggest?q=` | Top 6 matches for the header dropdown | – |
+| GET | `/search/suggest?q=` | Top 6 matches, total count and a "did you mean" product, for the header dropdown | – |
 | **Auth** ||||
 | POST | `/auth/register` | Create account, returns JWT | – |
 | POST | `/auth/login` | Check password, returns JWT | – |
@@ -122,28 +122,33 @@ Errors always look the same: `{"error": "human readable message"}` with the righ
 ## 4. Features done extensively
 
 ### A. Typo-tolerant search
-Eneba's search is how people find games. Typos are common ("wichter", "cyberpnk").
+Eneba's search is how people find games. Typos are common ("wticher", "cyberpnk").
 
-How it works (in Go, our own code, about 100 lines):
-1. **Normalize**: lowercase, remove punctuation, `"Grand Theft Auto V"` → `grand theft auto v`.
-2. **Split into words** (tokens), both in the query and in product titles.
-3. **Score each product**. Every query word must match some title word:
-   - exact word → 3 points
-   - title word starts with the query word (`cyber` → `cyberpunk`) → 2 points
-   - **Edit distance** (number of single-letter edits) small enough → 1 point.
-     We use Levenshtein plus one extra rule: **swapping two neighbouring letters counts as 1 edit**
-     (this variant is called Damerau-Levenshtein). Swaps are the most common typing mistake.
-     Allowed edits depend on length: up to 3 letters 0, 4–7 letters 1, 8+ letters 2.
-     So `wticher` → `witcher` (1 swap) and `cyberpnk` → `cyberpunk` (1 missing letter) match,
-     but `cat` does not match `car`.
-4. Sort by score. Ties are broken by sales count.
-5. The catalog is small (~80 products), so we keep search data **in memory** and rebuild it on startup. Fast and simple.
+How it works (`backend/search/`, our own code, no search engine; built and tested on Day 3):
+1. **Normalize**: lowercase, strip accents, punctuation splits words. `"Pokémon Scarlet"` → `pokemon scarlet`.
+2. **Extra word forms in titles**: joined neighbours (`spider man` → also `spiderman`, `baldur s` → `baldurs`) and Roman numerals as numbers (`V` → also `5`). The word `key` is ignored (it's in every title).
+3. **Nicknames** in the query: `gta`, `cod`, `rdr2`, `bg3`, `ff7`, `totk`, ... are expanded to the full words.
+4. **Every query word must match** some title word (AND), scored:
+   - exact word → 10 · prefix (`cyber` → `cyberpunk`) → 7
+   - 1 typo → 5 · 2 typos → 3 · half-typed word with a typo (`hogwrt` → `hogwarts`) → 2
+   - Typos are measured with **Damerau-Levenshtein** distance (insert, delete, replace, *or swap two neighbouring letters* = 1 edit).
+   - Allowed typos grow with word length: **1–3 letters: 0, 4–6: 1, 7+: 2**. Short words must be exact, otherwise `cod`/`god`/`cat` match each other.
+5. +5 bonus if the title starts with the query. Sort by score; ties → more popular product.
+6. Results under **half of the best score are dropped**, so `star` shows Stardew Valley and Starfield but not "Pokémon **Scar**let".
+7. Nothing matched → **"Did you mean"**: the product with the smallest total edit distance, if under half the letters differ.
+8. The index is built **in memory at startup** (80 products), so search costs no database queries.
 
-Extra polish:
-- Header dropdown with **debounce** (wait 250 ms after typing stops before calling the API), keyboard arrows + Enter, highlighted matching letters.
-- Pressing Enter opens the Store with `?q=...`, so search and filters work together.
-- "No results" state suggests the closest title.
-- **Unit tests** with a table of real typo cases (`go test ./search`).
+Where it's used:
+- `GET /api/search/suggest?q=`: top 6 + total + suggestion, for the header dropdown.
+- `GET /api/products?q=`: search combined with every store filter, sorted by `relevance` (best match) by default; other sorts still work.
+
+Frontend:
+- Header dropdown on every page: **debounce** (250 ms after the last key, older requests cancelled), ↑/↓ + Enter, Esc, click outside, matched words highlighted, "See all N results".
+- Enter with nothing highlighted → `/store?q=...`, so search and filters work together; the search text shows as a removable chip.
+- "No results" shows the "Did you mean" product, both in the dropdown and on the store page.
+- Accessible: ARIA combobox pattern (screen readers announce the highlighted result).
+
+Tests: `go test ./search` with a table of 35 real typos plus "must not match" cases; API tests on the seeded catalog; browser test of the dropdown.
 
 ### B. Checkout that cannot sell the same key twice
 This is the money path, so correctness matters most.

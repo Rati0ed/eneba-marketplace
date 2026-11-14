@@ -33,6 +33,13 @@ export type ProductList = {
   page_size: number
   total_pages: number
   sort: string
+  suggestion: ProductCard | null // "did you mean": only set when a search found nothing
+}
+
+export type SearchSuggestions = {
+  items: ProductCard[] // best matches, max 6
+  total: number // how many products match in total
+  suggestion: ProductCard | null // "did you mean", when nothing matched
 }
 
 export type FilterOption = { value: string; count: number }
@@ -75,6 +82,12 @@ export function fetchProducts(query: string, signal?: AbortSignal): Promise<Prod
 
 export function fetchProductFilters(signal?: AbortSignal): Promise<ProductFilters> {
   return apiGet<ProductFilters>('/api/products/filters', signal)
+}
+
+export function fetchSuggestions(query: string, signal?: AbortSignal): Promise<SearchSuggestions> {
+  // URLSearchParams encodes the text safely: "gta 5 & more" -> "q=gta+5+%26+more".
+  // Gluing raw text into a URL would break on characters like & ? #.
+  return apiGet<SearchSuggestions>('/api/search/suggest?' + new URLSearchParams({ q: query }), signal)
 }
 
 // ---------- Small formatting helpers ----------

@@ -147,3 +147,8 @@
     display: none; /* save space: the select itself says what it does */
   }
 }
+
+.suggestion-link {
+  color: var(--yellow);
+  font-weight: 700;
+}
