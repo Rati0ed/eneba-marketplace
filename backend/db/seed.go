@@ -138,6 +138,11 @@ func seed(database *sql.DB) error {
 		}
 	}
 
+	// 5. The demo account with one finished order (see demo.go).
+	if err := seedDemoAccount(tx); err != nil {
+		return err
+	}
+
 	return tx.Commit()
 }
 

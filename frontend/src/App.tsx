@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import Header from './components/Header'
+import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
 import StorePage from './pages/StorePage'
 import ProductPage from './pages/ProductPage'
@@ -32,6 +33,7 @@ export default function App() {
         {/* "*" matches anything else */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Footer />
     </>
   )
 }

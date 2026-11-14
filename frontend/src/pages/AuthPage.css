@@ -81,3 +81,23 @@
   color: var(--yellow);
   font-weight: 700;
 }
+
+.demo-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 233, 75, 0.08);
+  border: 1px dashed var(--yellow);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.demo-hint code {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.demo-hint .link-button {
+  padding: 2px 0 0;
+}

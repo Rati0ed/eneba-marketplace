@@ -76,6 +76,13 @@ export default function OrderPage() {
         <p className="form-error">This order couldn't be completed because an item sold out. You were not charged.</p>
       )}
 
+      {o.items.some((item) => item.keys.length > 0) && (
+        <p className="demo-key-note">
+          <strong>Demo keys, not redeemable.</strong> This is a demo store: payments are simulated and the keys are
+          generated, so they won't work on Steam, PlayStation, Xbox or Nintendo.
+        </p>
+      )}
+
       <ul className="order-items">
         {o.items.map((item) => (
           <li key={item.id} className="order-item">

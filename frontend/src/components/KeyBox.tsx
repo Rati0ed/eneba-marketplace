@@ -26,6 +26,9 @@ export default function KeyBox({ code }: { code: string }) {
       <code className="key-code" aria-live="polite">
         {revealed ? code : masked}
       </code>
+      <span className="key-demo-tag" title="Generated demo key: it won't work on any store">
+        Demo key
+      </span>
       <button type="button" className="btn btn-secondary btn-small" onClick={() => setRevealed(!revealed)}>
         {revealed ? 'Hide' : 'Reveal'}
       </button>

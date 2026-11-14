@@ -3,6 +3,10 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { safeNextPath, useAuth } from '../hooks/useAuth'
 import './AuthPage.css'
 
+// Created on every server start (backend/db/demo.go), so reviewers can sign in right away.
+const DEMO_EMAIL = 'demo@gamekey.test'
+const DEMO_PASSWORD = 'gamekey-demo'
+
 // One component for both /login and /register; `mode` decides which fields and texts to show.
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const auth = useAuth()
@@ -50,6 +54,25 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       <form className="auth-card" onSubmit={handleSubmit} noValidate>
         <h1>{isRegister ? 'Create your account' : 'Sign in'}</h1>
         {next.startsWith('/checkout') && <p className="muted">Sign in to finish your purchase. Your cart is saved.</p>}
+
+        {!isRegister && (
+          <div className="demo-hint">
+            <strong>Reviewing this project?</strong>
+            <span className="muted">
+              Demo account: <code>{DEMO_EMAIL}</code> / <code>{DEMO_PASSWORD}</code>. It already has a finished order with keys.
+            </span>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                setEmail(DEMO_EMAIL)
+                setPassword(DEMO_PASSWORD)
+              }}
+            >
+              Fill in the demo account
+            </button>
+          </div>
+        )}
 
         {/* role="alert" makes screen readers announce the error as soon as it appears */}
         {error && (

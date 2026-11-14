@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"fmt"
+
+	"github.com/Rati0ed/eneba-marketplace/backend/db"
 	"net/http"
 	"sync"
 	"testing"
@@ -247,8 +249,9 @@ func TestLastKeyRace(t *testing.T) {
 		t.Errorf("key sold %d times", sold)
 	}
 	var paid, failed int
-	h.DB.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'paid'`).Scan(&paid)
-	h.DB.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'failed'`).Scan(&failed)
+	// Only count THIS test's orders (the seeded demo account has a paid order too).
+	h.DB.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'paid' AND id >= ?`, orderIDs[0]).Scan(&paid)
+	h.DB.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'failed' AND id >= ?`, orderIDs[0]).Scan(&failed)
 	if paid != 1 || failed != buyers-1 {
 		t.Errorf("orders: %d paid, %d failed; want 1 and %d", paid, failed, buyers-1)
 	}
@@ -316,5 +319,26 @@ func TestLuhn(t *testing.T) {
 		if luhnValid(n) {
 			t.Errorf("%s should fail Luhn", n)
 		}
+	}
+}
+
+func TestDemoAccount(t *testing.T) {
+	h := newTestHandler(t)
+	var login authResponse
+	body := fmt.Sprintf(`{"email":%q,"password":%q}`, db.DemoEmail, db.DemoPassword)
+	if code := call(t, h, "POST", "/api/auth/login", body, "", &login); code != http.StatusOK {
+		t.Fatalf("demo login: %d %+v", code, login)
+	}
+	var history struct{ Items []Order }
+	call(t, h, "GET", "/api/orders", "", login.Token, &history)
+	if len(history.Items) != 1 || history.Items[0].Status != "paid" {
+		t.Fatalf("demo history = %+v", history.Items)
+	}
+	keys := 0
+	for _, item := range history.Items[0].Items {
+		keys += len(item.Keys)
+	}
+	if keys != 2 {
+		t.Errorf("demo order has %d keys, want 2", keys)
 	}
 }

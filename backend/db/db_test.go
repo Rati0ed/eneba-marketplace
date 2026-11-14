@@ -25,6 +25,11 @@ func TestSeedCreatesExpectedData(t *testing.T) {
 		{"SELECT COUNT(*) FROM products", 80},
 		{"SELECT COUNT(*) FROM sellers", 8},
 		{"SELECT COUNT(*) FROM homepage_blocks", 3},
+		// the demo account: 1 user, 1 paid order with 2 sold keys linked to it
+		{"SELECT COUNT(*) FROM users WHERE email = '" + DemoEmail + "'", 1},
+		{"SELECT COUNT(*) FROM orders WHERE status = 'paid' AND card_last4 = '4242'", 1},
+		{"SELECT COUNT(*) FROM game_keys WHERE status = 'sold' AND order_item_id IS NOT NULL", 2},
+		{"SELECT COUNT(*) FROM orders o WHERE total_cents != (SELECT SUM(unit_price_cents * quantity) FROM order_items WHERE order_id = o.id)", 0},
 		// every product has between 2 and 5 offers
 		{"SELECT COUNT(*) FROM (SELECT COUNT(*) AS c FROM offers GROUP BY product_id) WHERE c NOT BETWEEN 2 AND 5", 0},
 		// every banner links to a product that exists
