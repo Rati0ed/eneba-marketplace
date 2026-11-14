@@ -76,3 +76,23 @@ Files: `frontend/src/components/SearchBar.tsx`, `frontend/src/components/Highlig
 3. **`SearchBar.tsx`**: what happens on Enter (a) with a result highlighted, (b) with nothing highlighted?
 4. **`Highlight.tsx`**: what would happen if a user typed `c++ (pc` and we didn't escape the regex characters?
 5. **`Header.tsx`**: what does `key={urlQuery}` on `<SearchBar>` achieve when the user presses the browser's back button?
+
+---
+
+## Day 4: Product page and homepage (backend)
+Files: `backend/handlers/product.go`, `backend/handlers/home.go`, `backend/handlers/routes.go`, `backend/handlers/home_test.go`, `backend/db/schema.sql`
+
+1. **`routes.go`**: both `/api/products/filters` and `/api/products/{slug}` match the URL `/api/products/filters`. Which handler runs, and why?
+2. **`product.go`**: how are the offers sorted, and why is a cheaper sold-out offer shown after a more expensive in-stock one?
+3. **`home.go` + `home_test.go`**: how would you add a fourth homepage row "Nintendo deals" without touching the frontend? What would you need to add in the backend?
+4. **`product.go`**: why does a missing product return 404 and not 500? Which Go error tells us it's missing?
+
+## Day 4: Product page and homepage (frontend)
+Files: `frontend/src/hooks/useApiData.ts`, `frontend/src/context/CartContext.tsx`, `frontend/src/pages/HomePage.tsx`, `frontend/src/components/BannerCarousel.tsx`, `frontend/src/pages/ProductPage.tsx`, `frontend/src/api.ts`
+
+1. **`HomePage.tsx`**: walk through what happens from opening `/` to seeing the "Top deals" row. How many API requests are made, and which part decides their order?
+2. **`api.ts` → `isSafeApiPath`**: what attack or mistake does it prevent? Give an example of a value it rejects.
+3. **`CartContext.tsx`**: why does the cart store only `offer_id` and `quantity`, and not the price? What happens if a user edits localStorage to `quantity: 999`?
+4. **`CartContext.tsx`**: why do we write `current.map(...)` / `[...current, x]` instead of changing the array directly?
+5. **`BannerCarousel.tsx`**: what would go wrong without `return () => clearInterval(timer)`?
+6. **`useApiData.ts`**: why does it return `data: null` while a new path is loading, instead of the previous data?

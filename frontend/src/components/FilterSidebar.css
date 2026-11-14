@@ -77,15 +77,3 @@
   color: var(--muted);
   font-size: 12px;
 }
-
-.link-button {
-  background: none;
-  border: none;
-  padding: 6px 4px 0;
-  color: var(--yellow);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}

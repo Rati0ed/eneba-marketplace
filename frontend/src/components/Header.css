@@ -35,6 +35,13 @@
   min-width: 0;
 }
 
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .header-nav a {
   font-weight: 600;
   color: var(--text);
@@ -60,4 +67,26 @@
   .header-nav {
     margin-left: auto;
   }
+}
+
+.cart-link {
+  position: relative; /* the badge is positioned on its corner */
+  display: flex;
+  align-items: center;
+}
+
+.cart-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--yellow);
+  color: var(--yellow-text);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
 }

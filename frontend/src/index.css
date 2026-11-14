@@ -93,3 +93,16 @@ a {
   outline: 2px solid var(--yellow);
   outline-offset: 2px;
 }
+
+/* A button that looks like a link (for small actions like "Clear filters"). */
+.link-button {
+  background: none;
+  border: none;
+  padding: 6px 4px 0;
+  color: var(--yellow);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}

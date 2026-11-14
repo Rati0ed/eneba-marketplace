@@ -580,3 +580,70 @@ Attributes that tell screen readers what's going on: `role="combobox"` on the in
 
 ### Resetting a component with `key` (again)
 `<SearchBar key={urlQuery} initialQuery={urlQuery} />` in `Header.tsx`: when the URL's `?q=` changes (a new search, or the back button), the search bar is re-created with the new text and a closed dropdown. Same trick as the price filter on Day 2.
+
+---
+
+## Day 4: Product page and homepage (backend)
+
+### Path parameters and route precedence
+`mux.HandleFunc("GET /api/products/{slug}", h.GetProduct)` → inside the handler `r.PathValue("slug")`. When two patterns match the same URL, Go picks the **more specific** one: `/api/products/filters` beats `/api/products/{slug}`. A test checks this (`TestProductPageEndpoints`).
+
+### sql.ErrNoRows → 404
+`QueryRow(...).Scan(...)` returns `sql.ErrNoRows` when nothing matched. That's the client asking for something that doesn't exist (**404**), not a server failure (500). We check it with `errors.Is(err, sql.ErrNoRows)`.
+
+### Correlated sub-query
+```sql
+SELECT o.id, ..., (SELECT COUNT(*) FROM game_keys k WHERE k.offer_id = o.id AND k.status = 'available') AS stock
+FROM offers o ...
+```
+The inner SELECT refers to `o` from the outer query, so it runs once per offer and counts that offer's keys (`handlers/product.go`).
+
+### Struct embedding
+`type ProductDetail struct { ProductCard; Description string }`: `ProductDetail` gets every `ProductCard` field, and the JSON stays flat. Go's alternative to inheritance: composition.
+
+### Data-driven homepage
+The homepage layout is **data**, not code. `homepage_blocks` rows say which block types to show, in which order, and which endpoint feeds each one. `TestHomeBlocksComeFromTheDatabase` changes the table (hides a block, moves and renames another) and checks that `/api/home/blocks` follows. No frontend change needed.
+
+### Routes in one place
+`handlers/routes.go` builds the router; `main.go` and the tests both use `h.Routes()`. Tests therefore go through the same routing as production (`call()` helper in `home_test.go`).
+
+---
+
+## Day 4: Product page and homepage (frontend)
+
+### Custom hooks (`useApiData`)
+A function starting with `use` that uses other hooks, so components can share logic. `useApiData(path)` does "fetch this API path, cancel if the path changes, give me data / error / loading / retry". Product page, homepage blocks, carousel and rows all use it instead of repeating the same 20 lines.
+
+### React Context (the cart)
+Context shares a value with every component inside its Provider, without passing props through each level ("prop drilling").
+```tsx
+<CartProvider>   {/* main.tsx: owns the cart state */}
+  <App />        {/* Header (badge), ProductPage (add), CartPage... all call useCart() */}
+</CartProvider>
+```
+`useCart()` reads it. If you forget the Provider, `useCart` throws a clear error.
+
+### localStorage
+Key-value storage in the browser that survives refresh and restart, per website. Only strings, so we `JSON.stringify` on save and `JSON.parse` on load (`CartContext.tsx`). It can throw (private mode, full) and can hold **anything** (users can edit it in DevTools), so loading checks every line and drops broken ones. The browser test puts garbage in it and checks the badge.
+Only offer ids and quantities are stored, **never prices**: those always come from the server.
+
+### Immutable updates
+`setLines(current => current.map(...))` creates a **new** array. React compares old and new state by reference; mutating the old array (`lines.push(x)`) looks like "no change" and the screen doesn't update. Spread `{ ...line, quantity: 2 }` copies an object with one field changed.
+
+### Lazy initial state
+`useState(loadCart)` (the function, not `loadCart()`): React calls it only on the first render, so localStorage isn't read on every render.
+
+### The "storage" event
+Fires in **other** tabs when localStorage changes. We listen for it, so adding to the cart in one tab updates the badge in another.
+
+### setInterval + cleanup (carousel)
+`setInterval` repeats every 6 s; the effect's cleanup `clearInterval` stops it when the component unmounts or when it's paused. Without cleanup, every re-run would start another interval and the slides would speed up.
+
+### Promise in parallel
+The product page calls `useApiData` twice, so details and offers load **at the same time**, not one after the other.
+
+### Only follow links/paths you trust
+Homepage blocks come from the database and tell the browser which endpoint to call and where "Show all" leads. `isSafeApiPath` only allows `/api/...`, and links must start with `/` but not `//` (`//evil.com` is a full URL to another site). A wrong DB row can't send users or requests to other websites.
+
+### Accessibility in the carousel
+`aria-hidden` on invisible slides, `tabIndex={-1}` on their buttons (Tab can't land on something invisible), pause on hover/focus, no auto-play with `prefers-reduced-motion`, labelled arrows and dots.
