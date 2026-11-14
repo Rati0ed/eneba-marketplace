@@ -647,3 +647,147 @@ Homepage blocks come from the database and tell the browser which endpoint to ca
 
 ### Accessibility in the carousel
 `aria-hidden` on invisible slides, `tabIndex={-1}` on their buttons (Tab can't land on something invisible), pause on hover/focus, no auto-play with `prefers-reduced-motion`, labelled arrows and dots.
+
+---
+
+## Day 5: Accounts and cart (backend)
+
+### bcrypt (password hashing)
+`backend/handlers/auth.go`:
+```go
+hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)   // register
+err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(typed))      // login: nil = match
+```
+- **One-way**: you can't turn the hash back into the password.
+- **Salted**: a random salt is built into each hash, so two users with password `123456` get different hashes, and precomputed "rainbow tables" are useless.
+- **Slow on purpose** (cost 10 ≈ 50–100 ms): fine for one login, terrible for an attacker trying billions of guesses on a stolen database.
+- **72-byte limit**: bcrypt ignores everything after 72 bytes, so we reject longer passwords instead of silently cutting them.
+The hash looks like `$2a$10$N9qo8uLOickgx2ZMRZoMye...`: algorithm, cost, salt and hash in one string.
+
+### JWT (JSON Web Token)
+Three base64 parts: `header.payload.signature`.
+- **payload** = claims: `sub` (user id), `exp` (expiry), `iat` (issued at), `iss` (issuer). Anyone can **read** it, so it holds no secrets.
+- **signature** = HMAC-SHA256 of header+payload with `JWT_SECRET`. Change one character of the payload and the signature no longer matches.
+- The server stores **no sessions**: it just checks the signature and the expiry on every request ("stateless"). The flip side: a token can't be cancelled before it expires (24 h).
+
+Checks we enforce in `parseToken`, each one tested in `TestMeAndTokenChecks`:
+- **Algorithm pinned to HS256.** A forged token with `"alg": "none"` (no signature at all) is a famous attack on libraries that trust the header.
+- **Issuer must be "gamekey"**, and **expiry is required**.
+- **The user must still exist** (our demo DB resets on restart).
+
+### Middleware with context (`RequireAuth`)
+```go
+mux.HandleFunc("GET /api/orders", h.RequireAuth(h.ListOrders))
+```
+`RequireAuth` takes a handler and returns a new one that checks the token first. On success it attaches the user to the request: `context.WithValue(r.Context(), userContextKey, user)`. The handler reads it back with `currentUser(r)`. A private key type (`contextKey`) avoids clashes with other packages.
+
+### Don't help attackers enumerate accounts
+- Login answers **the same message** for "no such email" and "wrong password".
+- When the email doesn't exist, we still run a bcrypt compare against a dummy hash, so the **response time** is the same too. Otherwise an attacker could time requests to learn which emails have accounts.
+- Registration does say "email already exists" (409): a usability trade-off almost every shop makes. Rate limiting would be the real defense (listed as future work).
+
+### Input validation
+- Emails are trimmed and lowercased (`Ana@X.com` = `ana@x.com`). Checked with `net/mail.ParseAddress`, plus a dot in the domain.
+- Passwords must be 8–72 characters, and not only spaces.
+- Names can be at most 40 characters, with no control characters.
+Errors are `400` with a sentence the UI can show as-is.
+
+### Unique constraint as the real duplicate check
+We don't do "SELECT, then INSERT if missing": two requests at once could both pass the SELECT. We INSERT and let the database's `UNIQUE(email)` refuse the second one (`sqlite3.ErrConstraintUnique` → 409).
+
+### Limiting request size
+`http.MaxBytesReader(w, r.Body, 64<<10)`: a request body over 64 KB is cut off, so nobody can make the server read a 1 GB upload. (`64<<10` = 64 × 1024.)
+
+### Go interfaces (`querier`, `dbRunner`)
+```go
+type querier interface {
+    QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+```
+An interface lists methods; **any** type that has them fits automatically (no `implements` keyword). Both `*sql.DB` and `*sql.Tx` fit, so `priceCart` works on its own (cart page) and inside the checkout transaction.
+
+---
+
+## Day 5: Accounts and cart (frontend)
+
+### Login state (`AuthContext`)
+- The token is saved in localStorage, so a refresh doesn't log you out.
+- On load we call `/api/auth/me` with the saved token. If it answers 401, the token is useless and we delete it. Until it answers, `status` is `'checking'` and protected pages show "Checking your session…" instead of wrongly redirecting.
+- **Logout** = forget the token in the browser. With JWTs there's no server session to delete.
+
+### Protected routes (`RequireAuth.tsx`)
+`<RequireAuth><OrdersPage/></RequireAuth>`: if not signed in, go to `/login?next=/orders`; after login, `navigate(next)`. This is **UX only**: the real protection is the server rejecting requests without a valid token. Frontend checks can always be bypassed.
+
+### Open redirect
+`/login?next=https://evil.com` would make our trusted login page send users to a phishing site after they sign in. `safeNextPath` only accepts paths starting with a single `/`. The browser test tries it.
+
+### Never trust the client: the cart quote
+The browser cart holds `{offer_id, quantity}` only. The cart page asks the server for prices every time (`useQuote`), and checkout prices are read from the DB again. A user who edits localStorage or the request can't change what they pay.
+
+### Accessible forms
+- `<label>` around or linked to every input (`htmlFor`), so clicking the label focuses the input and screen readers announce the field name.
+- No buttons inside a `<label>`: that's why the password field uses `htmlFor` (a bug the browser test caught).
+- `autoComplete` values (`email`, `current-password`, `new-password`, `cc-number`) let browsers and password managers fill the forms.
+- `role="alert"` on errors makes screen readers announce them.
+
+---
+
+## Day 6: Checkout (backend)
+
+### Transactions, for real
+`completeOrder` in `orders.go`:
+```go
+tx, _ := h.DB.BeginTx(ctx, nil)
+defer tx.Rollback()        // undo everything if we return early
+... claim keys, link them, update counters, mark order paid ...
+return tx.Commit()         // all saved together
+```
+After `Commit`, the deferred `Rollback` does nothing. Without the transaction, a crash halfway could leave keys sold for an unpaid order.
+
+### Race conditions and how we stop them
+The danger: buyers A and B both read "1 key available", and both sell it. Two independent protections:
+1. **`_txlock=immediate`**: SQLite allows one writer at a time; with this option a transaction waits for the lock at `BEGIN` instead of failing later. Payments queue up.
+2. **Conditional update**: `UPDATE ... WHERE id = ? AND status = 'available'`, then check `RowsAffected() == 1`. Even if two got this far, only one UPDATE can change the row.
+
+`TestLastKeyRace` makes 8 buyers pay at once. A **test hook** (`testHookBeforeClaim`) pauses each one right after finding the key, so the race happens every time. We checked the test by removing protection 1: it fails (7 × 500 errors), so the test really proves something. This is called **mutation testing**.
+
+### Idempotency
+Calling the same operation twice has the same effect as once. `POST /orders/{id}/pay` on a paid order just returns it. Double-clicks, retries after timeouts and the browser's "resend" can't charge twice. Tested sequentially and with two simultaneous requests.
+
+### HTTP status codes in checkout
+| Code | Meaning here |
+|---|---|
+| 201 | Order created |
+| 400 | Invalid card details / bad cart |
+| 401 | Not signed in / token expired |
+| **402** | Payment Required: card declined, order still pending, retry possible |
+| 404 | No such order **or not yours** (same answer, so IDs can't be probed) |
+| 409 | Conflict: sold out / not enough stock |
+
+### Luhn checksum
+Every real card number passes it. From the right, double every second digit (subtract 9 if over 9) and add everything up; the total must end in 0. It catches one wrong digit and most swapped pairs. `4242 4242 4242 4242` passes; `…4241` fails.
+
+### Storing payment data
+We store only `card_last4` (for "Paid with •••• 4242"). The full number and CVC are checked and then forgotten: never stored, never logged. Real shops use a payment provider so card numbers never touch their servers at all (PCI DSS).
+
+### Goroutines and WaitGroup (in tests)
+`go func() { ... }()` starts a function running **at the same time** as the rest. `sync.WaitGroup` waits for all of them: `wg.Add(1)` before starting each, `wg.Done()` when it finishes, `wg.Wait()` blocks until all are done. A closed channel (`close(start)`) releases all waiting goroutines at once, like a starting gun.
+
+---
+
+## Day 6: Checkout (frontend)
+
+### Two-step payment and retrying
+`CheckoutPage` remembers the pending order it created (`pendingOrder`), together with the cart it was made for. A declined card → the user fixes the card → **the same order** is paid. If the cart changes, a new order is created.
+
+### Preventing double submits
+`submitting` state disables the Pay button while the request runs. The server is idempotent too, so even a bypassed button can't double-charge. (Belt and braces.)
+
+### Render-order bug we fixed
+After payment we empty the cart, and the checkout page has a rule "empty cart → go to /cart". React re-rendered with the empty cart **before** the navigation to the order page happened, so buyers landed on /cart. Fix: store `paidOrderId` and check it **first** in the render. Lesson: when several state changes happen together, think about what each render will see.
+
+### Clipboard API
+`navigator.clipboard.writeText(code)` copies text. It only works on HTTPS/localhost and can be denied, so we catch the error and reveal the key for manual copying instead.
+
+### Masking secrets in the UI
+Keys show as `•••••-•••••-•••••` until "Reveal", because people share screenshots. `code.replace(/[^-]/g, '•')` replaces every character except dashes.

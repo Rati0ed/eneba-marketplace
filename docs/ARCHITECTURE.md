@@ -73,10 +73,10 @@ erDiagram
 | **offers** | id, product_id → products, seller_id → sellers, price_cents | One seller's price for one product. UNIQUE(product_id, seller_id). |
 | **game_keys** | id, offer_id → offers, code, status (`available`/`sold`), order_item_id → order_items (nullable) | Pre-generated keys. **Stock = number of available keys.** A key is assigned to a buyer only after payment. |
 | **users** | id, email (UNIQUE), password_hash, display_name, created_at | Passwords stored only as bcrypt hashes. |
-| **orders** | id, user_id → users, status (`pending`/`paid`/`failed`), total_cents, created_at, paid_at | |
+| **orders** | id, user_id → users, status (`pending`/`paid`/`failed`), total_cents, created_at, paid_at, card_last4 | Only the card's last 4 digits are stored, never the number. |
 | **order_items** | id, order_id → orders, offer_id → offers, quantity, unit_price_cents, product_title | Price and title are **copied** at purchase time, so history stays correct if prices change later. |
 | **banners** | id, title, subtitle, image_url, link_url, position | Content for the homepage banner block. |
-| **homepage_blocks** | id, type (`banner`/`product_row`), title, endpoint, position, is_active | Defines **which** blocks the homepage shows, in what order, and where each one gets its data. |
+| **homepage_blocks** | id, type (`banner`/`product_row`), title, endpoint, link_url, position, is_active | Defines **which** blocks the homepage shows, in what order, and where each one gets its data. |
 
 **Rules for the whole model**
 - **Money is stored as integer cents** (`1999` = €19.99). Floats give rounding errors: in Python `0.1 + 0.2 == 0.30000000000000004`.
@@ -109,11 +109,11 @@ All paths start with `/api`. All bodies are JSON. 🔒 = needs `Authorization: B
 | POST | `/auth/login` | Check password, returns JWT | – |
 | GET | `/auth/me` | Who am I? (used on page reload) | 🔒 |
 | **Cart and orders** ||||
-| POST | `/cart/quote` | Send cart items, get current prices, stock and total | – |
-| POST | `/orders` | Create a `pending` order from the cart (server recalculates prices) | 🔒 |
-| POST | `/orders/{id}/pay` | Simulated payment. On success, assigns keys | 🔒 |
+| POST | `/cart/quote` | `{items:[{offer_id, quantity}]}` → current prices, stock, total and a `problem` per line (`out_of_stock`, `not_enough_stock`, `not_found`). Max 20 lines, 1–10 per line | – |
+| POST | `/orders` | Create a `pending` order; prices looked up in the DB and copied into the order. 409 if something is unavailable | 🔒 |
+| POST | `/orders/{id}/pay` | Simulated card payment → keys delivered. 400 invalid card, **402 declined** (order stays pending), 409 sold out (order failed), 200 if already paid | 🔒 |
 | GET | `/orders` | My order history | 🔒 |
-| GET | `/orders/{id}` | One order with its keys (owner only) | 🔒 |
+| GET | `/orders/{id}` | One order with its keys. Someone else's order → 404, same as a missing one | 🔒 |
 
 Errors always look the same: `{"error": "human readable message"}` with the right HTTP status (400, 401, 404, 409, 500).
 
@@ -151,14 +151,21 @@ Frontend:
 Tests: `go test ./search` with a table of 35 real typos plus "must not match" cases; API tests on the seeded catalog; browser test of the dropdown.
 
 ### B. Checkout that cannot sell the same key twice
-This is the money path, so correctness matters most.
-- The server **recalculates** every price and checks stock. Prices sent from the browser are ignored.
-- Payment runs inside **one database transaction**: mark keys `sold` → link them to order items → mark order `paid`. If any step fails, everything rolls back.
-- Key claim uses `UPDATE game_keys SET status='sold' ... WHERE id=? AND status='available'`. If two buyers race for the last key, only one update succeeds. The other gets a clear "out of stock" error (409).
-- Simulated card: any valid-looking number passes; card ending in `0002` is declined, so we can show the failure path.
-- Paying the same order twice does nothing (it is already `paid`), so a double-click cannot charge twice.
-- Order history page with keys, a copy button and a hidden/reveal toggle.
-- Tests for: double payment, out of stock, someone else's order (404).
+This is the money path, so correctness matters most. (`backend/handlers/orders.go`, built on Day 6.)
+
+**Flow:** cart (browser) → `POST /api/orders` (pending order, DB prices copied in) → `POST /api/orders/{id}/pay` → keys.
+
+- **Server prices only.** The browser sends offer ids and quantities; prices come from the database at order creation. A test sends `"unit_price_cents": 1` and checks the total is still the real price.
+- **One transaction** at payment: claim keys → link them to order lines → update sales counters → mark order `paid`. Any failure rolls everything back.
+- **Two independent protections against double-selling a key:**
+  1. `_txlock=immediate`: every transaction takes SQLite's write lock at `BEGIN`, so payments run one after another.
+  2. Conditional update `UPDATE game_keys SET status='sold' ... WHERE id=? AND status='available'`, plus a check that exactly 1 row changed.
+- **Proven by a test, not by luck:** 8 buyers race for the last key at the same instant, with a test hook pausing each payment at the most dangerous point. Result: exactly one 200, seven 409 "sold out", key sold once. Removing protection 1 makes the test fail (SQLite then rejects the colliding writers with 500 errors), so the test really exercises it.
+- **Idempotent payment:** paying an already-paid order returns it unchanged: no second charge, no second set of keys. Tested sequentially and with two simultaneous requests (double-click).
+- **Simulated card:** Luhn checksum, expiry (valid to the end of its month), CVC. `4242 4242 4242 4242` succeeds; a card ending in **`0002`** is declined with **402** and the order stays `pending`, so the user can retry with another card (the frontend reuses the same order).
+- **Sold out during payment** → 409, order marked `failed`, nothing charged.
+- **Privacy:** every order query includes `AND user_id = ?`; other users' orders return 404, exactly like missing ones (no ID probing).
+- **Frontend:** test-card helper, input formatting, Pay button disabled while paying, success page with keys masked by default, Reveal/Hide, Copy (Clipboard API with fallback), order history.
 
 ### C. Store catalog with filters
 - Filters combine (platform + region + price range + search), all done **in SQL on the server**, with pagination.
@@ -188,10 +195,17 @@ Everything else (homepage, product page, auth) is done properly but without extr
 | Generated SVG covers instead of game art | We have no rights to publisher art. Covers are drawn by our API, so there's no external image host that could break during review. |
 | CGO SQLite driver | Needs a C compiler at build time (Render has one). In exchange: the most battle-tested Go SQLite driver. |
 | Few dependencies | Every line must be explainable in an interview. |
+| Keys are claimed at payment, not reserved at order creation | Simpler; the cost is that a buyer can lose a race for the last key between "create order" and "pay". They get a clear 409 and are never charged. |
+| JWTs can't be revoked before they expire | No session table needed. Mitigated by a 24 h lifetime; logout deletes the token in the browser. A real shop would add refresh tokens or a deny-list. |
+| No login rate limiting | Out of scope for 7 days. bcrypt makes each guess slow; a real deployment would add per-IP and per-account limits (e.g. 5 tries/min). |
+| `golang.org/x/crypto` pinned to v0.48.0 | Newest version that builds with Go 1.24, which our build environment had. bcrypt itself is unchanged between versions. |
+| Seeded sample keys use a fixed random seed | Same demo data every start; they're fake keys. Real keys would come from sellers, stored encrypted. |
 
 ---
 
 ## 6. Seven-day plan
+
+Status: Days 1–6 built, tested and deployed by Sat 14 Nov; Day 7 (polish, README, final checks) and the code review session follow.
 
 | Day | Goal | Done when |
 |---|---|---|

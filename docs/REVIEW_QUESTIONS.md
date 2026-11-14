@@ -96,3 +96,43 @@ Files: `frontend/src/hooks/useApiData.ts`, `frontend/src/context/CartContext.tsx
 4. **`CartContext.tsx`**: why do we write `current.map(...)` / `[...current, x]` instead of changing the array directly?
 5. **`BannerCarousel.tsx`**: what would go wrong without `return () => clearInterval(timer)`?
 6. **`useApiData.ts`**: why does it return `data: null` while a new path is loading, instead of the previous data?
+
+---
+
+## Day 5: Accounts and cart (backend)
+Files: `backend/handlers/auth.go`, `backend/handlers/auth_test.go`, `backend/handlers/cart.go`, `backend/main.go`
+
+1. **`auth.go`**: why bcrypt and not SHA-256 for passwords? What are the "salt" and the "cost"?
+2. **`auth.go`**: why do we reject passwords longer than 72 bytes?
+3. **`auth.go` → `Login`**: why is `bcrypt.CompareHashAndPassword(dummyHash, ...)` called when the email doesn't exist?
+4. **`auth.go` → `parseToken`**: what is the `"alg": "none"` attack, and which line stops it?
+5. **`auth.go` → `RequireAuth`**: after checking the signature, why do we still look the user up in the database?
+6. **`cart.go`**: a user sends `{"offer_id": 5, "quantity": 1, "unit_price_cents": 1}`. Where does the price used by the server come from, and why is `unit_price_cents` ignored?
+7. **`main.go`**: what happens if `JWT_SECRET` is not set? Why is that acceptable locally but would be bad with a persistent database?
+
+## Day 5: Accounts and cart (frontend)
+Files: `frontend/src/context/AuthContext.tsx`, `frontend/src/components/RequireAuth.tsx`, `frontend/src/hooks/useAuth.ts`, `frontend/src/pages/AuthPage.tsx`, `frontend/src/pages/CartPage.tsx`
+
+1. **`AuthContext.tsx`**: walk through what happens when a signed-in user presses F5. Which request is made, and what if it returns 401?
+2. **`RequireAuth.tsx`**: if someone removes `<RequireAuth>` with browser dev tools, can they see other people's orders? Why not?
+3. **`useAuth.ts` → `safeNextPath`**: what is an open redirect? Give a URL it blocks.
+4. **`AuthContext.tsx`**: what's the security trade-off of keeping the JWT in localStorage instead of a cookie, and why did we accept it?
+
+## Day 6: Checkout (backend)
+Files: `backend/handlers/orders.go`, `backend/handlers/orders_test.go`, `backend/db/db.go`
+
+1. **`orders.go` → `completeOrder`**: list the steps inside the transaction. What could go wrong if they weren't in one transaction?
+2. **`orders.go` + `db.go`**: name the TWO protections that stop a key from being sold twice. What did the mutation test show when we removed `_txlock=immediate`?
+3. **`orders_test.go` → `TestLastKeyRace`**: why was the first version of this test useless, and what does `testHookBeforeClaim` change?
+4. **`orders.go` → `PayOrder`**: what happens on a second payment of a paid order? What's the word for this property?
+5. **`orders.go`**: why does a declined card return 402 and leave the order `pending`, while "sold out" returns 409 and marks it `failed`?
+6. **`orders.go` → `loadOrder`**: user B asks for user A's order 7. What does B get, and why not 403 Forbidden?
+7. **`orders.go`**: what do we store about the card, and why only that?
+
+## Day 6: Checkout (frontend)
+Files: `frontend/src/pages/CheckoutPage.tsx`, `frontend/src/pages/OrderPage.tsx`, `frontend/src/components/KeyBox.tsx`
+
+1. **`CheckoutPage.tsx`**: the first card is declined, the second works. How many orders are created, and which variable makes that happen?
+2. **`CheckoutPage.tsx`**: explain the bug where buyers landed on `/cart` after paying, and how `paidOrderId` fixes it.
+3. **`CheckoutPage.tsx`**: what are the two layers that stop a double-click from paying twice?
+4. **`KeyBox.tsx`**: why are keys hidden by default, and what happens if the clipboard is blocked?
