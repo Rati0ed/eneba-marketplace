@@ -32,7 +32,10 @@ func Open(path string) (*sql.DB, error) {
 	//   _foreign_keys=on   enforce REFERENCES (SQLite ignores them by default)
 	//   _journal_mode=WAL  readers don't block the writer and vice versa
 	//   _busy_timeout=5000 if the DB is locked, wait up to 5 s instead of failing at once
-	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", path)
+	//   _txlock=immediate  every transaction takes the write lock at BEGIN, not at its first write.
+	//                      SQLite allows one writer at a time; locking up front means two checkouts
+	//                      queue up cleanly instead of both reading stock and then colliding.
+	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000&_txlock=immediate", path)
 
 	// sql.Open does not connect yet; it only prepares a connection pool.
 	database, err := sql.Open("sqlite3", dsn)

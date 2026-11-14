@@ -47,7 +47,9 @@ CREATE TABLE orders (
     status      TEXT    NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed')),
     total_cents INTEGER NOT NULL,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    paid_at     TEXT                            -- NULL until paid
+    paid_at     TEXT,                           -- NULL until paid
+    card_last4  TEXT                            -- last 4 digits of the card, for "Paid with •••• 4242"
+                                                -- (the full card number is never stored)
 );
 
 -- Title and price are COPIED at purchase time, so order history stays correct
@@ -85,6 +87,7 @@ CREATE TABLE homepage_blocks (
     type      TEXT    NOT NULL CHECK (type IN ('banner', 'product_row')),
     title     TEXT    NOT NULL,
     endpoint  TEXT    NOT NULL,                 -- e.g. "/api/home/deals"
+    link_url  TEXT,                             -- "Show all" link, e.g. "/store?sort=discount" (NULL = none)
     position  INTEGER NOT NULL,
     is_active INTEGER NOT NULL DEFAULT 1        -- SQLite has no BOOLEAN: 1 = true, 0 = false
 );

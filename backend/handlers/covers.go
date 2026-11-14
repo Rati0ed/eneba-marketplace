@@ -19,6 +19,7 @@ var platformColors = map[string]string{
 }
 
 // Cover answers GET /api/covers/{file}, e.g. /api/covers/elden-ring-pc-steam-global.svg.
+// Add ?layout=wide for a 1200x400 homepage banner version.
 // It DRAWS a placeholder cover as an SVG image: a colored gradient + the game name +
 // a platform badge. We use these instead of real game art, which we have no rights to.
 func (h *Handler) Cover(w http.ResponseWriter, r *http.Request) {
@@ -60,15 +61,33 @@ func (h *Handler) Cover(w http.ResponseWriter, r *http.Request) {
 		badgeColor = "#333333"
 	}
 
-	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
-<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+	// The inside of a 300x400 portrait cover: gradient, name, platform badge.
+	cover := fmt.Sprintf(`<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="hsl(%d, 70%%, 45%%)"/><stop offset="1" stop-color="#1a0b3d"/>
 </linearGradient></defs>
 <rect width="300" height="400" fill="url(#g)"/>
 <g font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="700" fill="#ffffff">%s</g>
 <rect x="0" y="352" width="300" height="48" fill="%s"/>
-<text x="24" y="383" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#ffffff">%s</text>
-</svg>`, hue, textLines.String(), badgeColor, html.EscapeString(strings.ToUpper(platform)))
+<text x="24" y="383" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#ffffff">%s</text>`,
+		hue, textLines.String(), badgeColor, html.EscapeString(strings.ToUpper(platform)))
+
+	var svg string
+	if r.URL.Query().Get("layout") == "wide" {
+		// Homepage banner, 1200x400: a dark gradient with two soft circles, and the portrait
+		// cover placed on the right (a nested <svg> scales it). The left side stays empty
+		// because the frontend writes the banner's title and button there.
+		svg = fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#1a0b3d"/><stop offset="1" stop-color="hsl(%d, 65%%, 35%%)"/>
+</linearGradient></defs>
+<rect width="1200" height="400" fill="url(#bg)"/>
+<circle cx="980" cy="200" r="260" fill="hsl(%d, 70%%, 50%%)" opacity="0.18"/>
+<circle cx="760" cy="420" r="180" fill="#4618ac" opacity="0.35"/>
+<svg x="880" y="50" width="225" height="300" viewBox="0 0 300 400">%s</svg>
+</svg>`, hue, hue, cover)
+	} else {
+		svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">` + cover + `</svg>`
+	}
 
 	w.Header().Set("Content-Type", "image/svg+xml")
 	// Covers never change while the server runs, so browsers may cache them for a day.

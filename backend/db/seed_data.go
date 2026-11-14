@@ -119,12 +119,13 @@ type homepageBlock struct {
 	Type     string
 	Title    string
 	Endpoint string
+	LinkURL  string // "Show all" link; "" = no link
 }
 
 var homepageBlocks = []homepageBlock{
-	{"banner", "Featured", "/api/home/banners"},
-	{"product_row", "Best sellers", "/api/home/best-sellers"},
-	{"product_row", "Top deals", "/api/home/deals"},
+	{"banner", "Featured", "/api/home/banners", ""},
+	{"product_row", "Best sellers", "/api/home/best-sellers", "/store?sort=popular"},
+	{"product_row", "Top deals", "/api/home/deals", "/store?sort=discount"},
 }
 
 // Banner slides. Slug points to the product the banner links to.

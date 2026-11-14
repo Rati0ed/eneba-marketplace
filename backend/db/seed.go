@@ -124,15 +124,15 @@ func seed(database *sql.DB) error {
 	for i, b := range banners {
 		if _, err := tx.Exec(
 			`INSERT INTO banners (title, subtitle, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)`,
-			b.Title, b.Subtitle, "/api/covers/"+b.Slug+".svg", "/product/"+b.Slug, i+1,
+			b.Title, b.Subtitle, "/api/covers/"+b.Slug+".svg?layout=wide", "/product/"+b.Slug, i+1,
 		); err != nil {
 			return fmt.Errorf("insert banner: %w", err)
 		}
 	}
 	for i, b := range homepageBlocks {
 		if _, err := tx.Exec(
-			`INSERT INTO homepage_blocks (type, title, endpoint, position) VALUES (?, ?, ?, ?)`,
-			b.Type, b.Title, b.Endpoint, i+1,
+			`INSERT INTO homepage_blocks (type, title, endpoint, link_url, position) VALUES (?, ?, ?, NULLIF(?, ''), ?)`,
+			b.Type, b.Title, b.Endpoint, b.LinkURL, i+1,
 		); err != nil {
 			return fmt.Errorf("insert homepage block: %w", err)
 		}

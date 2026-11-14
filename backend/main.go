@@ -39,14 +39,8 @@ func main() {
 
 	h := &handlers.Handler{DB: database, Search: searchIndex}
 
-	// The router ("mux") maps "METHOD /path" to a handler function.
-	// Since Go 1.22 the standard library supports methods and {wildcards} in patterns.
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", h.Health)
-	mux.HandleFunc("GET /api/products", h.ListProducts)
-	mux.HandleFunc("GET /api/products/filters", h.ProductFilters)
-	mux.HandleFunc("GET /api/search/suggest", h.SearchSuggest)
-	mux.HandleFunc("GET /api/covers/{file}", h.Cover)
+	// All URL -> handler mappings are in handlers/routes.go.
+	mux := h.Routes()
 
 	// Wrap the router in middleware: Logging runs first, then CORS, then the route's handler.
 	handler := middleware.Logging(middleware.CORS(allowedOrigin, mux))
