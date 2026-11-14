@@ -35,3 +35,23 @@ Files: `frontend/src/api.ts`, `frontend/src/App.tsx`, `frontend/src/vite-env.d.t
 3. **`src/App.tsx`**: why is the request inside `useEffect` and not written directly in the component function body? What would happen if it were in the body?
 4. **`src/App.tsx`**: what are the three states the page can be in, and what does the user see in each?
 5. **`src/api.ts`**: `fetch` gets a `404` response. Does it throw an error? How does `apiGet` handle it?
+
+---
+
+## Day 2: Store (backend)
+Files: `backend/handlers/products.go`, `backend/handlers/cards.go`, `backend/handlers/products_test.go`
+
+1. **`products.go`**: why can't `sort` be passed into SQL with a `?` placeholder, and how does `sortOptions` keep us safe from SQL injection anyway?
+2. **`products.go`**: what does `?platform=Steam&platform=Xbox&region=Europe` return? Which conditions are joined with OR and which with AND?
+3. **`cards.go`**: why do we need the `WITH cards AS (...)` CTE to filter by lowest price? Why doesn't `WHERE MIN(o.price_cents) <= ?` work?
+4. **`products.go`**: why are prices in the URL whole euros while everything else uses cents? Where exactly do we convert?
+5. **`products.go`**: a request for `page=99` returns 200 with no items, but `page=0` returns 400. Why the difference?
+
+## Day 2: Store (frontend)
+Files: `frontend/src/pages/StorePage.tsx`, `frontend/src/components/FilterSidebar.tsx`, `frontend/src/components/ProductCard.tsx`, `frontend/vercel.json`
+
+1. **`StorePage.tsx`**: the filters are stored only in the URL. Name three things that work *because* of that.
+2. **`StorePage.tsx`**: there's no `loading` state variable. How does the page know it's loading?
+3. **`StorePage.tsx`**: what bug would appear without `controller.abort()` in the effect cleanup if the user clicks two filters quickly?
+4. **`FilterSidebar.tsx`**: why do the price inputs only update the URL on "Apply", and what does `key={`${minPrice}-${maxPrice}`}` do?
+5. **`vercel.json`**: what happens on the live site if you refresh `/store?platform=Steam` without the rewrite rule?

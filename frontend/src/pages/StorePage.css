@@ -1,0 +1,149 @@
+.store-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.store-heading h1 {
+  margin: 0;
+  font-size: 28px;
+  overflow-wrap: anywhere; /* a very long search text can't break the layout */
+}
+
+.store-count {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Two columns: fixed-width sidebar + flexible results. CSS Grid places them side by side. */
+.store-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.store-sidebar {
+  position: sticky; /* filters stay visible while scrolling the results */
+  top: 84px; /* below the sticky header */
+}
+
+.store-results {
+  min-width: 0; /* lets the grid shrink instead of overflowing on small screens */
+}
+
+.store-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.store-filters-toggle {
+  display: none; /* only shown on small screens, see below */
+  margin-right: auto;
+}
+
+.sort-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sort-select select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  background: var(--surface-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px; /* fully rounded "pill" */
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--yellow);
+}
+
+/* auto-fill: as many 180px+ columns as fit, each stretched equally (1fr). Responsive with no media query. */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  transition: opacity 0.15s;
+}
+
+.product-grid.refreshing {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.empty-state {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty-state h2 {
+  margin: 0 0 8px;
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+/* Tablets and phones: sidebar becomes a collapsible panel above the results. */
+@media (max-width: 900px) {
+  .store-layout {
+    grid-template-columns: 1fr;
+  }
+  .store-sidebar {
+    display: none;
+    position: static;
+  }
+  .store-sidebar.open {
+    display: block;
+  }
+  .store-filters-toggle {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 480px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .sort-select span {
+    display: none; /* save space: the select itself says what it does */
+  }
+}

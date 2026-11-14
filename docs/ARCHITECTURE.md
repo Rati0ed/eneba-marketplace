@@ -99,8 +99,8 @@ All paths start with `/api`. All bodies are JSON. 🔒 = needs `Authorization: B
 | GET | `/home/best-sellers?limit=12` | Products ranked by sales | – |
 | GET | `/home/deals?limit=12` | Products with the biggest discount vs MSRP | – |
 | **Catalog** ||||
-| GET | `/products?q=&platform=&region=&min_price=&max_price=&sort=&page=` | Store listing with filters, sort and pages. `sort` = `price_asc`, `price_desc`, `newest`, `relevance` | – |
-| GET | `/products/filters` | Available platforms, regions and price range, so filter options are not hardcoded | – |
+| GET | `/products?q=&platform=&region=&genre=&min_price=&max_price=&sort=&page=` | Store listing, 24 per page. `platform`/`region`/`genre` can repeat (OR within one filter, AND between filters). Prices in **whole euros**. `sort` = `popular` (default), `price_asc`, `price_desc`, `discount`, `newest`, `relevance` (with `q`). Bad values → 400 | – |
+| GET | `/products/filters` | Platforms, regions and genres with product counts, plus the price range, so filter options are not hardcoded | – |
 | GET | `/products/{slug}` | Product details | – |
 | GET | `/products/{slug}/offers` | All seller offers for it, cheapest first, with stock | – |
 | GET | `/search/suggest?q=` | Top 6 matches for the header dropdown | – |

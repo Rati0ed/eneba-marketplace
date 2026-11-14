@@ -1,0 +1,146 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden; /* clips the image to the rounded corners */
+  color: var(--text);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  background: var(--surface-hover);
+}
+
+.card.sold-out .card-image img {
+  opacity: 0.5;
+}
+
+.card-image {
+  aspect-ratio: 3 / 4; /* reserve the image's space before it loads: no layout jump */
+  background: var(--surface-hover);
+}
+
+.card-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-discount {
+  background: var(--green);
+  color: var(--green-text);
+  font-weight: 800;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  /* Show at most 2 lines, then "…" */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em; /* 2 lines, so cards with short titles stay aligned */
+}
+
+.card-region {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--yellow);
+}
+
+.card-from {
+  margin-top: auto; /* pushes price to the bottom of the card */
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-msrp {
+  color: var(--muted);
+}
+
+.card-price {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.card-price-row {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.card-sold-out {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ---------- Loading skeleton ---------- */
+
+.card-skeleton:hover {
+  transform: none;
+}
+
+.skeleton {
+  /* A light stripe moves across a darker background: the "shimmer" effect. */
+  background: linear-gradient(90deg, var(--surface-hover) 25%, #432c8a 50%, var(--surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite linear;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeleton-line.short {
+  width: 40%;
+}
+
+.skeleton-line.price {
+  margin-top: 16px;
+  height: 20px;
+  width: 55%;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Respect users who turned off animations in their OS settings. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .card {
+    transition: none;
+  }
+}

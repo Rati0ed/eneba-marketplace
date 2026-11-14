@@ -411,3 +411,103 @@ Every request can be slow or fail. `App.tsx` keeps three pieces of state (`loadi
 
 ### AbortController
 Cancels a `fetch` that's in progress. We cancel in the effect's cleanup, so a late answer never updates a component that's gone.
+
+---
+
+## Day 2: Store (backend)
+
+### Pagination with LIMIT / OFFSET
+```sql
+... ORDER BY sales_count DESC LIMIT 24 OFFSET 24   -- page 2
+```
+`LIMIT` = how many rows, `OFFSET` = how many to skip. Page `n` skips `(n-1) * 24`. A second query `SELECT COUNT(*)` with the **same WHERE** gives `total`, and `total_pages = ceil(total / 24)`.
+The page size is fixed on the server (`pageSize` in `handlers/products.go`), so nobody can request a million rows.
+
+### CTE (`WITH ... AS`)
+A named sub-query you can use like a table (`handlers/cards.go`):
+```sql
+WITH cards AS (SELECT p.*, MIN(o.price_cents) AS lowest_price_cents ... GROUP BY p.id)
+SELECT * FROM cards WHERE lowest_price_cents <= ? ORDER BY ...
+```
+We need it because you can't filter on `MIN(...)` with a normal `WHERE` (WHERE runs before grouping). Inside the CTE the minimum is calculated; outside it's just a column.
+
+### Building a WHERE clause safely
+`buildWhere` adds a condition only for filters the user chose, and keeps **SQL text** and **values** separate:
+```go
+"WHERE platform IN (?, ?) AND lowest_price_cents >= ?"   // text: written by us
+[]any{"Steam", "Xbox", 1000}                              // values: from the user
+```
+The number of `?` is generated (`placeholders(2)` → `"?, ?"`), but the user's text never enters the SQL string.
+
+### Allow-list (when placeholders can't be used)
+`ORDER BY` and column names can't be `?` placeholders. So the user sends a **key** (`sort=price_asc`) and we look up SQL we wrote ourselves in `sortOptions`. Anything not in the map is rejected with 400. `?sort=price; DROP TABLE products` is just an unknown key. A test checks this (`TestListProductsRejectsBadInput`).
+
+### Validate input, answer 400
+Bad input (`page=abc`, `min_price=-5`, `min_price > max_price`) gets `400 Bad Request` with a message saying what's wrong, instead of a 500 or silently wrong results. Rule: **400 = the client's mistake, 500 = our bug.**
+
+### Repeated query parameters
+`?platform=Steam&platform=Xbox` → in Go, `query["platform"]` gives `["Steam", "Xbox"]` (`query.Get` would only give the first). In the browser, `URLSearchParams.getAll('platform')` does the same.
+
+### COALESCE
+`COALESCE(a, b)` returns `a` unless it's NULL, then `b`. Used in `ProductFilters` so an empty table gives a price range of 0 instead of NULL.
+
+### Testing handlers with httptest
+`httptest.NewRequest` builds a fake request and `httptest.NewRecorder` is a fake `ResponseWriter` that remembers the status and body. We call the handler function directly and check the JSON: no real server, no network, fast (`handlers/products_test.go`).
+
+---
+
+## Day 2: Store (frontend)
+
+### React Router
+Lets one React app have many pages with real URLs (`App.tsx`):
+```tsx
+<Route path="/store" element={<StorePage />} />
+<Route path="/product/:slug" element={<ProductPage />} />
+```
+- `<Link to="/store">` changes the URL **without reloading** the page.
+- `useParams()` reads `:slug` from the URL.
+- `<Navigate to="/store" />` redirects.
+
+### Why vercel.json has a "rewrite"
+On a refresh at `/store`, the browser asks Vercel for a file called `/store`, which doesn't exist (there is only `index.html`). The rewrite says "for any path, send `index.html`"; then React Router reads the URL and shows the right page. Without it, refreshing any page except `/` gives a 404.
+
+### The URL as state (`useSearchParams`)
+On the store, **the URL is the only place filters are stored**:
+```
+/store?platform=Steam&region=Europe&sort=price_asc&page=2
+```
+Clicking a filter changes the URL, and the URL change triggers the fetch (`useEffect` depends on `queryString`). Benefits: back/forward buttons work, refresh keeps filters, links can be shared. And the store URL params equal the API params, so we pass `searchParams.toString()` straight to `/api/products`.
+
+### Derived state (don't store what you can calculate)
+`StorePage` doesn't keep a `loading` flag. It remembers which request its results belong to (`loaded.key`) and calculates:
+```ts
+const loading = loaded.key !== requestKey
+```
+Two separate states (`loading` + `result`) can get out of sync; a calculation can't. Same idea: `selected` filters and `chips` are calculated from the URL on every render, not stored.
+
+### Race conditions and AbortController
+Click "Steam", then quickly "Xbox": two requests run. If the Steam answer arrives **last**, it would overwrite the Xbox results. The effect's cleanup aborts the old request when the URL changes, so only the newest answer is used.
+
+### Props and "lifting state up"
+Props are a component's inputs, like function arguments: `<Pagination page={2} totalPages={4} onChange={setPage} />`.
+`FilterSidebar` doesn't change the URL itself. `StorePage` owns the state and passes down **values** (`selected`) and **functions** (`onToggle`). One owner = one source of truth.
+
+### The `key` trick to reset a component
+`<PriceFilter key={`${minPrice}-${maxPrice}`} ... />`: when `key` changes, React throws the old component away and creates a fresh one. We use it so the price inputs reset after "Clear filters", while still letting the user type freely (local state) without a request per keystroke.
+
+### Loading skeletons
+Grey placeholder cards with the same size as real ones (`ProductCardSkeleton`). The page has its final layout immediately, so nothing jumps when data arrives. On later filter changes we keep the old cards visible but faded (`.refreshing`), which flickers less.
+
+---
+
+## CSS used for the design
+
+- **CSS variables** (`index.css`): `--purple: #4618ac` defined once, used as `var(--purple)`. The whole theme is in one place.
+- **Flexbox** (`display: flex`): lines things up in a row or column, e.g. the header: logo | search | nav.
+- **Grid** (`display: grid`): 2D layouts. The product grid uses `repeat(auto-fill, minmax(180px, 1fr))`: "as many columns of at least 180px as fit". It's responsive without media queries.
+- **Media queries** (`@media (max-width: 900px)`): different rules for small screens. The sidebar becomes a toggle panel.
+- **`position: sticky`**: the header and sidebar stay visible while scrolling.
+- **`aspect-ratio: 3 / 4`**: reserves the image box before the image loads (no layout jump).
+- **`-webkit-line-clamp: 2`**: titles cut to 2 lines with "…".
+- **`:focus-visible`**: a yellow outline for keyboard users only. Accessibility.
+- **`prefers-reduced-motion`**: turns off animations for users who disabled them in their OS.

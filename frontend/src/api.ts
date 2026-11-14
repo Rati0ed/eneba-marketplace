@@ -7,9 +7,11 @@
 // .replace(/\/$/, '') removes a trailing slash, so "https://x.com/" + "/api" doesn't become "//api".
 export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '')
 
-// The shape of one product in GET /api/products. Must match ProductCard in
-// backend/handlers/products.go. TypeScript checks that we only use fields that exist.
+// ---------- Types: the shapes of the JSON our API sends ----------
+// They must match the Go structs (backend/handlers/cards.go, products.go).
+// TypeScript then checks that we only use fields that exist.
 // Python comparison: like a TypedDict / dataclass describing a dict.
+
 export type ProductCard = {
   id: number
   slug: string
@@ -20,12 +22,33 @@ export type ProductCard = {
   image_url: string
   msrp_cents: number
   lowest_price_cents: number | null // null = every offer is sold out
+  discount_percent: number // 0 = no discount
   offer_count: number
 }
 
+export type ProductList = {
+  items: ProductCard[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  sort: string
+}
+
+export type FilterOption = { value: string; count: number }
+
+export type ProductFilters = {
+  platforms: FilterOption[]
+  regions: FilterOption[]
+  genres: FilterOption[]
+  price: { min: number; max: number } // whole euros
+}
+
+// ---------- Fetch helpers ----------
+
 // apiGet fetches `path` from our API and returns the parsed JSON.
-// <T> is a "generic": the caller says what type of JSON it expects, e.g. apiGet<{ items: ProductCard[] }>.
-// `signal` lets the caller cancel the request (see App.tsx).
+// <T> is a "generic": the caller says what type of JSON it expects, e.g. apiGet<ProductList>.
+// `signal` lets the caller cancel the request (see the useEffect cleanups in the pages).
 async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   // `await` pauses this function until the network answers, without freezing the page.
   const response = await fetch(API_URL + path, { signal })
@@ -44,10 +67,17 @@ async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function fetchProducts(signal?: AbortSignal): Promise<ProductCard[]> {
-  const data = await apiGet<{ items: ProductCard[] }>('/api/products', signal)
-  return data.items
+// The store page passes its URL query straight through (e.g. "platform=Steam&sort=price_asc"),
+// because the store URL and the API use the SAME parameter names. One source of truth: the URL.
+export function fetchProducts(query: string, signal?: AbortSignal): Promise<ProductList> {
+  return apiGet<ProductList>('/api/products' + (query ? '?' + query : ''), signal)
 }
+
+export function fetchProductFilters(signal?: AbortSignal): Promise<ProductFilters> {
+  return apiGet<ProductFilters>('/api/products/filters', signal)
+}
+
+// ---------- Small formatting helpers ----------
 
 // The API stores image paths like "/api/covers/x.svg"; images must load from the API's domain.
 export function imageUrl(path: string): string {

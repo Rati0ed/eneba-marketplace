@@ -1,90 +1,95 @@
-/* Day 1: just enough styling to be readable. Full Eneba-style design comes on Day 2. */
+/* Global styles: design tokens (colors, sizes) + base elements + shared buttons.
+   Each component has its own CSS file next to it (Header.css, ProductCard.css, ...). */
 
 :root {
-  /* CSS variables: define colors once, use them everywhere with var(--name). */
-  --bg: #1a0b3d;
-  --surface: #2a1563;
+  /* CSS variables ("design tokens"): define each color once, use it everywhere with var(--name).
+     Changing the theme = changing these lines. Palette built around Eneba's brand purple #4618ac. */
+  --purple: #4618ac; /* header, brand */
+  --bg: #1b0a42; /* page background */
+  --surface: #29145f; /* cards, panels */
+  --surface-hover: #351d75;
+  --border: rgba(255, 255, 255, 0.1);
   --text: #ffffff;
-  --text-muted: #b9aee0;
-  --accent: #ffe94b;
-  --error: #ff6b6b;
+  --muted: #b3a6dd;
+  --yellow: #ffe94b; /* main call-to-action */
+  --yellow-text: #1b0a42; /* dark text on yellow, for contrast */
+  --green: #3ee59a; /* discount badges */
+  --green-text: #0b3320;
+  --error: #ff7a7a;
 
-  font-family: system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --page-width: 1280px;
+
+  font-family: 'Montserrat', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  line-height: 1.5;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
-  box-sizing: border-box;
+  box-sizing: border-box; /* width includes padding and border: much easier sizing */
 }
 
 body {
   margin: 0;
   background: var(--bg);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 .page {
-  max-width: 960px;
+  max-width: var(--page-width);
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 24px 16px 48px;
 }
 
-.status {
-  color: var(--text-muted);
+.muted {
+  color: var(--muted);
 }
 
-.status.error {
-  color: var(--error);
-}
+/* ---------- Buttons ---------- */
 
-.product-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-/* Each row: image | title + meta | price */
-.product-row {
-  display: flex;
+.btn {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-radius: 8px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
 }
 
-.product-row img {
-  border-radius: 4px;
-  flex-shrink: 0;
+.btn:hover {
+  filter: brightness(1.1);
 }
 
-.product-info {
-  flex: 1;
-  min-width: 0; /* lets long titles wrap instead of pushing the price off screen */
+.btn-primary {
+  background: var(--yellow);
+  color: var(--yellow-text);
 }
 
-.product-title {
-  font-weight: 600;
+.btn-secondary {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
-.product-meta {
-  color: var(--text-muted);
+.btn-small {
+  padding: 8px 14px;
   font-size: 14px;
 }
 
-.product-price {
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.product-price .from {
-  color: var(--text-muted);
-  font-weight: 400;
-  font-size: 13px;
-}
-
-.sold-out {
-  color: var(--text-muted);
+/* Visible focus ring for keyboard users (Tab key), hidden for mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
 }
