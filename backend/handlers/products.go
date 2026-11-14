@@ -28,11 +28,14 @@ var sortOptions = map[string]string{
 	"newest":     "lowest_price_cents IS NULL, release_date DESC, sales_count DESC, id",
 	// discount = how much of the MSRP you save. "* 1.0" forces decimal division (5/10 would be 0 in integers).
 	"discount": "lowest_price_cents IS NULL, (msrp_cents - lowest_price_cents) * 1.0 / msrp_cents DESC, sales_count DESC, id",
+	// "relevance" = best search match first. The real ORDER BY is built from the search
+	// results (see relevanceOrder in search.go); this value is only used if there's no search.
+	"relevance": "lowest_price_cents IS NULL, sales_count DESC, id",
 }
 
 // productFilter is everything the user can choose on the store page, already validated.
 type productFilter struct {
-	Query         string   // search text (typo-tolerant search is added on Day 3)
+	Query         string   // search text, matched by the typo-tolerant search (search package)
 	Platforms     []string // any of these (OR); empty = all
 	Regions       []string
 	Genres        []string
@@ -81,9 +84,12 @@ func parseProductFilter(query url.Values) (productFilter, error) {
 		return f, fmt.Errorf("min_price can't be higher than max_price")
 	}
 
-	// Default sort: best sellers. (On Day 3, a search defaults to best match.)
+	// Default sort: best match when searching, best sellers otherwise.
 	if f.Sort == "" {
 		f.Sort = "popular"
+		if f.Query != "" {
+			f.Sort = "relevance"
+		}
 	}
 	if _, ok := sortOptions[f.Sort]; !ok {
 		return f, fmt.Errorf("unknown sort %q", f.Sort)
@@ -163,6 +169,42 @@ func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	whereSQL, args := buildWhere(f)
+	orderSQL := sortOptions[f.Sort]
+	var orderArgs []any
+
+	// With a search text: the search index decides WHICH products match (and their order),
+	// SQL then applies the normal filters, sorting and pages on top of that.
+	if f.Query != "" {
+		results := h.Search.Search(f.Query, 0)
+		if len(results) == 0 {
+			// Nothing matched at all: answer right away, with a "did you mean" product if we have one.
+			suggestion, err := h.closestCard(r.Context(), f.Query)
+			if err != nil {
+				serverError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"items": []ProductCard{}, "total": 0, "page": f.Page, "page_size": pageSize,
+				"total_pages": 0, "sort": f.Sort, "suggestion": suggestion,
+			})
+			return
+		}
+
+		// Add "id IN (...)" to the other filters: "WHERE platform IN (?) AND id IN (?, ?, ...)".
+		idsSQL, idArgs := idsWhere(results)
+		if whereSQL == "" {
+			whereSQL = idsSQL
+		} else {
+			whereSQL += " AND " + strings.TrimPrefix(idsSQL, "WHERE ")
+		}
+		args = append(args, idArgs...)
+
+		if f.Sort == "relevance" {
+			caseSQL, caseArgs := relevanceOrder(results)
+			orderSQL = "lowest_price_cents IS NULL, " + caseSQL
+			orderArgs = caseArgs
+		}
+	}
 
 	total, err := h.countCards(r.Context(), whereSQL, args)
 	if err != nil {
@@ -171,8 +213,9 @@ func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Page 1 = rows 0-23, page 2 = rows 24-47, ...
+	// The ORDER BY's own ? values come after the WHERE's in the SQL text, so they go after them in the list.
 	offset := (f.Page - 1) * pageSize
-	items, err := h.queryCards(r.Context(), whereSQL, args, sortOptions[f.Sort], pageSize, offset)
+	items, err := h.queryCards(r.Context(), whereSQL, append(args, orderArgs...), orderSQL, pageSize, offset)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -185,6 +228,7 @@ func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		"page_size":   pageSize,
 		"total_pages": int(math.Ceil(float64(total) / pageSize)),
 		"sort":        f.Sort, // tells the frontend which sort was actually used
+		"suggestion":  nil,    // only set when a search finds nothing (see above)
 	})
 }
 

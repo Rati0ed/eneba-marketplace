@@ -7,13 +7,16 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/Rati0ed/eneba-marketplace/backend/search"
 )
 
-// Handler holds what every handler needs (for now only the database).
-// Handlers are methods on it, so they can use h.DB without a global variable.
+// Handler holds what every handler needs: the database and the search index.
+// Handlers are methods on it, so they can use h.DB and h.Search without global variables.
 // Python comparison: like a class with self.db, where each endpoint is a method.
 type Handler struct {
-	DB *sql.DB
+	DB     *sql.DB
+	Search *search.Index // in-memory typo-tolerant search, built at startup
 }
 
 // writeJSON sends any Go value as a JSON response with the given status code.

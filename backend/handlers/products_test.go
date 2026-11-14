@@ -18,7 +18,11 @@ func newTestHandler(t *testing.T) *Handler {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { database.Close() }) // runs when the test ends, like defer
-	return &Handler{DB: database}
+	index, err := BuildSearchIndex(database)
+	if err != nil {
+		t.Fatalf("search index: %v", err)
+	}
+	return &Handler{DB: database, Search: index}
 }
 
 // listResponse is the JSON shape of GET /api/products.
