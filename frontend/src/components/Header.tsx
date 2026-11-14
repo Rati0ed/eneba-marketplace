@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation } from 'react-router'
 import SearchBar from './SearchBar'
 import { useCart } from '../hooks/useCart'
+import { useAuth } from '../hooks/useAuth'
 import './Header.css'
 
 // The purple bar at the top of every page.
@@ -9,6 +10,7 @@ export default function Header() {
   const location = useLocation()
   const urlQuery = location.pathname === '/store' ? (new URLSearchParams(location.search).get('q') ?? '') : ''
   const { count } = useCart()
+  const auth = useAuth()
 
   return (
     <header className="header">
@@ -29,7 +31,23 @@ export default function Header() {
 
         <nav className="header-nav">
           {/* NavLink adds class "active" when its page is open, so we can highlight it. */}
-          <NavLink to="/store">Store</NavLink>
+          <NavLink to="/store" className="hide-on-phone">
+            Store
+          </NavLink>
+          {auth.user ? (
+            <>
+              {/* title = tooltip with the full name/email */}
+              <NavLink to="/orders" title={`Signed in as ${auth.user.email}`}>
+                Orders
+              </NavLink>
+              <button className="header-logout" onClick={auth.logout}>
+                Log out
+              </button>
+            </>
+          ) : (
+            // Remember the current page, so after signing in the user comes back here.
+            <NavLink to={'/login?' + new URLSearchParams({ next: location.pathname + location.search })}>Sign in</NavLink>
+          )}
           <NavLink to="/cart" className="cart-link" aria-label={`Cart, ${count} ${count === 1 ? 'item' : 'items'}`}>
             {/* Shopping cart icon drawn with SVG */}
             <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">

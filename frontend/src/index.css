@@ -53,6 +53,14 @@ a {
   color: var(--muted);
 }
 
+.small {
+  font-size: 13px;
+}
+
+.error-text {
+  color: var(--error);
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {

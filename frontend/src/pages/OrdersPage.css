@@ -1,0 +1,159 @@
+/* Shared by the order history (/orders) and one order (/orders/:id). */
+
+.success-banner {
+  background: linear-gradient(90deg, rgba(62, 229, 154, 0.18), rgba(62, 229, 154, 0.04));
+  border: 1px solid var(--green);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.success-banner h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.success-banner p {
+  margin: 0;
+}
+
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-header h2 {
+  margin: 0;
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.status-badge.paid {
+  background: var(--green);
+  color: var(--green-text);
+}
+
+.status-badge.pending {
+  background: #ffb547;
+  color: #3a2300;
+}
+
+.status-badge.failed {
+  background: var(--error);
+  color: #3a0000;
+}
+
+.order-items {
+  list-style: none;
+  margin: 20px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-item {
+  display: flex;
+  gap: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.order-item img {
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.order-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.order-item-title {
+  font-weight: 700;
+}
+
+.key-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.key-code {
+  flex: 1;
+  min-width: 190px;
+  font-size: 16px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: 160px 1fr auto 120px;
+  gap: 16px;
+  align-items: center;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+}
+
+.order-row:hover {
+  background: var(--surface-hover);
+}
+
+.order-row-items {
+  font-size: 14px;
+  min-width: 0;
+}
+
+.order-row-items div {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.order-row-total {
+  text-align: right;
+}
+
+.link-like {
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .order-row {
+    grid-template-columns: 1fr auto;
+  }
+  .order-row-items {
+    grid-column: 1 / -1; /* full width row */
+    grid-row: 2;
+  }
+}

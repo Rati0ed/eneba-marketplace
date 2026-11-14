@@ -269,3 +269,15 @@ const euroFormat = new Intl.NumberFormat('en-IE', { style: 'currency', currency:
 export function formatPrice(cents: number): string {
   return euroFormat.format(cents / 100)
 }
+
+// SQLite stores dates like "2026-11-14 18:05:12" in UTC. Turning it into "2026-11-14T18:05:12Z"
+// (Z = UTC) lets the browser convert it to the user's local time: "14 Nov 2026, 20:05".
+export function formatDate(sqliteDate: string): string {
+  return new Date(sqliteDate.replace(' ', 'T') + 'Z').toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}

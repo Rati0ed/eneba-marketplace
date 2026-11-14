@@ -90,3 +90,24 @@
   line-height: 18px;
   text-align: center;
 }
+
+.header-logout {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.header-logout:hover {
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .hide-on-phone {
+    display: none;
+  }
+}

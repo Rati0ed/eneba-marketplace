@@ -111,10 +111,6 @@
   max-width: 760px;
 }
 
-.error-text {
-  color: var(--error);
-}
-
 /* ---------- Offers ---------- */
 
 .offer-list {
